@@ -24,11 +24,13 @@ namespace Datadog.Trace.ClrProfiler.IntegrationTests
         public static TheoryData<string, string, HttpStatusCode, bool, string, string, Dictionary<string, string>> Data =>
             new TheoryData<string, string, HttpStatusCode, bool, string, string, Dictionary<string, string>>
             {
-                { "/Admin/Home/Index", "GET /admin/home/index", HttpStatusCode.OK, false, null, null, AdminHomeIndexTags() },
-                { "/Home/Index", "GET /home/index", HttpStatusCode.OK, false, null, null, HomeIndexTags() },
-                { "/Home/BadRequest", "GET /home/badrequest", HttpStatusCode.InternalServerError, true, null, null, BadRequestTags() },
-                { "/Home/StatusCode?value=201", "GET /home/statuscode", HttpStatusCode.Created, false, null, null, StatusCodeTags() },
-                { "/Home/StatusCode?value=503", "GET /home/statuscode", HttpStatusCode.ServiceUnavailable, true, null, "The HTTP response has status code 503.", StatusCodeTags() },
+                { "/Admin/Home/Index", "GET /admin/home/index/{id}", HttpStatusCode.OK, false, null, null, AdminHomeIndexTags() },
+                { "/Home/Index", "GET /home/index/{id}", HttpStatusCode.OK, false, null, null, HomeIndexTags() },
+                { "/Home/BadRequest", "GET /home/badrequest/{id}", HttpStatusCode.InternalServerError, true, null, null, BadRequestTags() },
+                { "/Home/identifier/123", "GET /home/identifier/{id}", HttpStatusCode.OK, false, null, null, IdentifierTags() },
+                { "/Home/identifier/BadValue", "GET /home/identifier/{id}", HttpStatusCode.InternalServerError, true, null, null, IdentifierTags() },
+                { "/Home/StatusCode?value=201", "GET /home/statuscode/{id}", HttpStatusCode.Created, false, null, null, StatusCodeTags() },
+                { "/Home/StatusCode?value=503", "GET /home/statuscode/{id}", HttpStatusCode.ServiceUnavailable, true, null, "The HTTP response has status code 503.", StatusCodeTags() },
             };
 
         [Theory]
@@ -92,6 +94,14 @@ namespace Datadog.Trace.ClrProfiler.IntegrationTests
                 { Tags.AspNetRoute, DefaultRoute() },
                 { Tags.AspNetController, "home" },
                 { Tags.AspNetAction, "statuscode" }
+            };
+
+        private static Dictionary<string, string> IdentifierTags() =>
+            new Dictionary<string, string>
+            {
+                { Tags.AspNetRoute, DefaultRoute() },
+                { Tags.AspNetController, "home" },
+                { Tags.AspNetAction, "identifier" }
             };
     }
 }
