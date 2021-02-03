@@ -54,6 +54,54 @@ namespace Datadog.Trace.Tests.DiagnosticListeners
         }
 
         [Fact]
+        public async Task<string> CompleteDiagnosticObserverTest_CustomRoute()
+        {
+            Tracer.Instance = GetTracer();
+
+            var builder = new WebHostBuilder()
+                .UseStartup<Startup>();
+
+            var testServer = new TestServer(builder);
+            var client = testServer.CreateClient();
+            var observers = new List<DiagnosticObserver> { new AspNetCoreDiagnosticObserver() };
+            string retValue = null;
+
+            using (var diagnosticManager = new DiagnosticManager(observers))
+            {
+                diagnosticManager.Start();
+                DiagnosticManager.Instance = diagnosticManager;
+                retValue = await client.GetStringAsync("/statuscode/200");
+                DiagnosticManager.Instance = null;
+            }
+
+            return retValue;
+        }
+
+        [Fact]
+        public async Task<string> CompleteDiagnosticObserverTest_AttributeRouting()
+        {
+            Tracer.Instance = GetTracer();
+
+            var builder = new WebHostBuilder()
+                .UseStartup<Startup>();
+
+            var testServer = new TestServer(builder);
+            var client = testServer.CreateClient();
+            var observers = new List<DiagnosticObserver> { new AspNetCoreDiagnosticObserver() };
+            string retValue = null;
+
+            using (var diagnosticManager = new DiagnosticManager(observers))
+            {
+                diagnosticManager.Start();
+                DiagnosticManager.Instance = diagnosticManager;
+                retValue = await client.GetStringAsync("/statuscode");
+                DiagnosticManager.Instance = null;
+            }
+
+            return retValue;
+        }
+
+        [Fact]
         public void HttpRequestIn_PopulateSpan()
         {
             var tracer = GetTracer();
@@ -116,7 +164,11 @@ namespace Datadog.Trace.Tests.DiagnosticListeners
 
             public void Configure(IApplicationBuilder builder)
             {
-                builder.UseMvcWithDefaultRoute();
+                builder.UseMvc(routes =>
+                {
+                    routes.MapRoute("custom", "Test/{action=Index}", new { Controller = "MyTest" });
+                    routes.MapRoute("default", "{controller=Home}/{action=Index}/{id?}");
+                });
             }
         }
 
@@ -155,6 +207,18 @@ namespace Datadog.Trace.Tests.DiagnosticListeners
         {
             throw new Exception();
         }
+    }
+
+    public class MyTestController : Controller
+    {
+        public async Task<string> Index()
+        {
+            await Task.Yield();
+            return "Hello world";
+        }
+
+        [HttpGet("/statuscode/{value=200}")]
+        public string SetStatusCode(int value) => value.ToString();
     }
 }
 
