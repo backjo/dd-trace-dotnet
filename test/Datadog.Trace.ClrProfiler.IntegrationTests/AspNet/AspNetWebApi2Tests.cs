@@ -44,7 +44,8 @@ namespace Datadog.Trace.ClrProfiler.IntegrationTests
             HttpStatusCode expectedStatusCode,
             bool isError,
             string expectedErrorType,
-            string expectedErrorMessage)
+            string expectedErrorMessage,
+            Dictionary<string, string> expectedTags)
         {
             await AssertWebServerSpan(
                 path,
@@ -57,7 +58,8 @@ namespace Datadog.Trace.ClrProfiler.IntegrationTests
                 "web",
                 "aspnet-webapi.request",
                 expectedResourceName,
-                "1.0.0");
+                "1.0.0",
+                expectedTags);
         }
 
         private static Dictionary<string, string> EnvironmentTags() =>
