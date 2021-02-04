@@ -331,12 +331,14 @@ namespace Datadog.Trace.DiagnosticListeners
 
                 string rawRouteTemplate = actionDescriptor.AttributeRouteInfo?.Template;
                 RouteTemplate routeTemplate = null;
-                string cleanedRouteTemplate = null;
-                try
+                if (rawRouteTemplate is not null)
                 {
-                    routeTemplate = TemplateParser.Parse(rawRouteTemplate);
+                    try
+                    {
+                        routeTemplate = TemplateParser.Parse(rawRouteTemplate);
+                    }
+                    catch { }
                 }
-                catch { }
 
                 if (routeTemplate is null)
                 {
@@ -369,7 +371,7 @@ namespace Datadog.Trace.DiagnosticListeners
                                 })))
                         .Where(segment => !string.IsNullOrEmpty(segment));
 
-                    cleanedRouteTemplate = string.Join("/", routeSegments)?.ToLowerInvariant();
+                    var cleanedRouteTemplate = string.Join("/", routeSegments)?.ToLowerInvariant();
 
                     resourcePathName =
                         cleanedRouteTemplate
@@ -395,7 +397,7 @@ namespace Datadog.Trace.DiagnosticListeners
                     tags.AspNetAction = actionName;
                     tags.AspNetController = controllerName;
                     tags.AspNetArea = areaName;
-                    tags.AspNetRoute = cleanedRouteTemplate;
+                    tags.AspNetRoute = routeTemplate?.TemplateText.ToLowerInvariant();
                 }
             }
         }

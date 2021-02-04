@@ -1,5 +1,6 @@
 #if !NETFRAMEWORK
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -15,7 +16,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
+using Newtonsoft.Json;
 using Xunit;
+using Xunit.Abstractions;
 using Xunit.Sdk;
 
 namespace Datadog.Trace.Tests.DiagnosticListeners
@@ -24,6 +27,21 @@ namespace Datadog.Trace.Tests.DiagnosticListeners
     [TracerRestorer]
     public class AspNetCoreDiagnosticObserverTests
     {
+        public static TheoryData<string, bool, string, ExpectedTags> Data =>
+            new TheoryData<string, bool, string, ExpectedTags>
+            {
+                { "/", false, "GET /home/index", ConventionalRouteTags() },
+                { "/Home", false, "GET /home/index", ConventionalRouteTags() },
+                { "/Home/Index", false, "GET /home/index", ConventionalRouteTags() },
+                { "/Home/Error", true, "GET /home/error", ConventionalRouteTags(action: "error") },
+                { "/MyTest", false, "GET /mytest/index", ConventionalRouteTags(controller: "mytest") },
+                { "/MyTest/index", false, "GET /mytest/index", ConventionalRouteTags(controller: "mytest") },
+                { "/statuscode", false, "GET /statuscode/{value}", StatusCodeTags() },
+                { "/statuscode/100", false, "GET /statuscode/{value}", StatusCodeTags() },
+                { "/statuscode/Oops", false, "GET /statuscode/{value}", StatusCodeTags() },
+                { "/statuscode/200", false, "GET /statuscode/{value}", StatusCodeTags() },
+            };
+
         [Fact]
         public async Task<string> CompleteDiagnosticObserverTest()
         {
@@ -53,52 +71,37 @@ namespace Datadog.Trace.Tests.DiagnosticListeners
             return retValue;
         }
 
-        [Fact]
-        public async Task<string> CompleteDiagnosticObserverTest_CustomRoute()
+        [Theory]
+        [MemberData(nameof(Data))]
+        public async Task DiagnosticObserver_SubmitsSpans(string path, bool isError, string resourceName, ExpectedTags expectedTags)
         {
-            Tracer.Instance = GetTracer();
+            var writer = new AgentWriterStub();
+            var tracer = GetTracer(writer);
 
             var builder = new WebHostBuilder()
                 .UseStartup<Startup>();
 
-            var testServer = new TestServer(builder);
+            using var testServer = new TestServer(builder);
             var client = testServer.CreateClient();
-            var observers = new List<DiagnosticObserver> { new AspNetCoreDiagnosticObserver() };
-            string retValue = null;
+            var observers = new List<DiagnosticObserver> { new AspNetCoreDiagnosticObserver(tracer) };
 
             using (var diagnosticManager = new DiagnosticManager(observers))
             {
                 diagnosticManager.Start();
-                DiagnosticManager.Instance = diagnosticManager;
-                retValue = await client.GetStringAsync("/statuscode/200");
-                DiagnosticManager.Instance = null;
+                try
+                {
+                    await client.GetStringAsync(path);
+                }
+                catch (Exception ex)
+                {
+                    Assert.True(isError, $"Unexpected error calling endpoint: {ex}");
+                }
             }
 
-            return retValue;
-        }
+            var trace = Assert.Single(writer.Traces);
+            var span = Assert.Single(trace);
 
-        [Fact]
-        public async Task<string> CompleteDiagnosticObserverTest_AttributeRouting()
-        {
-            Tracer.Instance = GetTracer();
-
-            var builder = new WebHostBuilder()
-                .UseStartup<Startup>();
-
-            var testServer = new TestServer(builder);
-            var client = testServer.CreateClient();
-            var observers = new List<DiagnosticObserver> { new AspNetCoreDiagnosticObserver() };
-            string retValue = null;
-
-            using (var diagnosticManager = new DiagnosticManager(observers))
-            {
-                diagnosticManager.Start();
-                DiagnosticManager.Instance = diagnosticManager;
-                retValue = await client.GetStringAsync("/statuscode");
-                DiagnosticManager.Instance = null;
-            }
-
-            return retValue;
+            AssertSpan(span, resourceName, expectedTags);
         }
 
         [Fact]
@@ -120,24 +123,19 @@ namespace Datadog.Trace.Tests.DiagnosticListeners
 
             Assert.NotNull(span);
 
-            Assert.Equal("aspnet_core.request", span.OperationName);
-            Assert.Equal("aspnet_core", span.GetTag(Tags.InstrumentationName));
-            Assert.Equal(SpanTypes.Web, span.Type);
-            Assert.Equal("GET /home/?/action", span.ResourceName);
-            Assert.Equal(SpanKinds.Server, span.GetTag(Tags.SpanKind));
+            AssertSpan(span, resourceName: "GET /home/?/action", expectedTags: null);
             Assert.Equal("GET", span.GetTag(Tags.HttpMethod));
             Assert.Equal("localhost", span.GetTag(Tags.HttpRequestHeadersHost));
             Assert.Equal("http://localhost/home/1/action", span.GetTag(Tags.HttpUrl));
-            Assert.Equal(TracerConstants.Language, span.GetTag(Tags.Language));
         }
 
-        private static Tracer GetTracer()
+        private static Tracer GetTracer(IAgentWriter writer = null)
         {
             var settings = new TracerSettings();
-            var writerMock = new Mock<IAgentWriter>();
+            var agentWriter = writer ?? new Mock<IAgentWriter>().Object;
             var samplerMock = new Mock<ISampler>();
 
-            return new Tracer(settings, writerMock.Object, samplerMock.Object, scopeManager: null, statsd: null);
+            return new Tracer(settings, agentWriter, samplerMock.Object, scopeManager: null, statsd: null);
         }
 
         private static HttpContext GetHttpContext()
@@ -153,6 +151,64 @@ namespace Datadog.Trace.Tests.DiagnosticListeners
             httpContext.Request.Method = "GET";
 
             return httpContext;
+        }
+
+        private static void AssertSpan(
+            Span span,
+            string resourceName,
+            ExpectedTags expectedTags)
+        {
+            Assert.Equal("aspnet_core.request", span.OperationName);
+            Assert.Equal("aspnet_core", span.GetTag(Tags.InstrumentationName));
+            Assert.Equal(SpanTypes.Web, span.Type);
+            Assert.Equal(resourceName, span.ResourceName);
+            Assert.Equal(SpanKinds.Server, span.GetTag(Tags.SpanKind));
+            Assert.Equal(TracerConstants.Language, span.GetTag(Tags.Language));
+
+            if (expectedTags is not null)
+            {
+                foreach (var expectedTag in expectedTags.Tags)
+                {
+                    Assert.Equal(expectedTag.Value, span.Tags.GetTag(expectedTag.Key));
+                }
+            }
+        }
+
+        private static ExpectedTags ConventionalRouteTags(string action = "index", string controller = "home") =>
+            new ExpectedTags
+            {
+                { Tags.AspNetRoute, "{controller=home}/{action=index}/{id?}" },
+                { Tags.AspNetController, controller },
+                { Tags.AspNetAction, action },
+            };
+
+        private static ExpectedTags StatusCodeTags() =>
+            new ExpectedTags
+            {
+                { Tags.AspNetRoute, "statuscode/{value=200}" },
+                { Tags.AspNetController, "mytest" },
+                { Tags.AspNetAction, "setstatuscode" },
+            };
+
+        public class ExpectedTags : IXunitSerializable, IEnumerable<KeyValuePair<string, string>>
+        {
+            public Dictionary<string, string> Tags { get; private set; } = new Dictionary<string, string>();
+
+            public void Add(string key, string value) => Tags.Add(key, value);
+
+            public IEnumerator<KeyValuePair<string, string>> GetEnumerator() => Tags.GetEnumerator();
+
+            IEnumerator IEnumerable.GetEnumerator() => Tags.GetEnumerator();
+
+            public void Deserialize(IXunitSerializationInfo info)
+            {
+                Tags = JsonConvert.DeserializeObject<Dictionary<string, string>>(info.GetValue<string>(nameof(Tags)));
+            }
+
+            public void Serialize(IXunitSerializationInfo info)
+            {
+                info.AddValue(nameof(Tags), JsonConvert.SerializeObject(Tags));
+            }
         }
 
         private class Startup
@@ -188,6 +244,19 @@ namespace Datadog.Trace.Tests.DiagnosticListeners
                 Tracer.Instance = _tracer;
                 base.After(methodUnderTest);
             }
+        }
+
+        private class AgentWriterStub : IAgentWriter
+        {
+            public List<Span[]> Traces { get; } = new List<Span[]>();
+
+            public Task FlushAndCloseAsync() => Task.CompletedTask;
+
+            public Task FlushTracesAsync() => Task.CompletedTask;
+
+            public Task<bool> Ping() => Task.FromResult(true);
+
+            public void WriteTrace(Span[] trace) => Traces.Add(trace);
         }
     }
 
