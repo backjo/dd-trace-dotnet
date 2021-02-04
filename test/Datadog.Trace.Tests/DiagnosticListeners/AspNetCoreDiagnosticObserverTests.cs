@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using Datadog.Trace.Agent;
 using Datadog.Trace.Configuration;
@@ -45,14 +46,14 @@ namespace Datadog.Trace.Tests.DiagnosticListeners
         [Fact]
         public async Task<string> CompleteDiagnosticObserverTest()
         {
-            Tracer.Instance = GetTracer();
+            var tracer = GetTracer();
 
             var builder = new WebHostBuilder()
                 .UseStartup<Startup>();
 
             var testServer = new TestServer(builder);
             var client = testServer.CreateClient();
-            var observers = new List<DiagnosticObserver> { new AspNetCoreDiagnosticObserver() };
+            var observers = new List<DiagnosticObserver> { new AspNetCoreDiagnosticObserver(tracer) };
             string retValue = null;
 
             using (var diagnosticManager = new DiagnosticManager(observers))
@@ -81,7 +82,7 @@ namespace Datadog.Trace.Tests.DiagnosticListeners
             var builder = new WebHostBuilder()
                 .UseStartup<Startup>();
 
-            using var testServer = new TestServer(builder);
+            var testServer = new TestServer(builder);
             var client = testServer.CreateClient();
             var observers = new List<DiagnosticObserver> { new AspNetCoreDiagnosticObserver(tracer) };
 
@@ -95,6 +96,20 @@ namespace Datadog.Trace.Tests.DiagnosticListeners
                 catch (Exception ex)
                 {
                     Assert.True(isError, $"Unexpected error calling endpoint: {ex}");
+                }
+
+                // The diagnostic observer runs on a separate thread
+                // This gives time for the Stop event to run and to be flushed to the writer
+                var iterations = 10;
+                while (iterations > 0)
+                {
+                    if (writer.Traces.Count > 0)
+                    {
+                        break;
+                    }
+
+                    Thread.Sleep(10);
+                    iterations--;
                 }
             }
 
