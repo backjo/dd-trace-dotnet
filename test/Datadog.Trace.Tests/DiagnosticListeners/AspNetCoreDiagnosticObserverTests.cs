@@ -11,9 +11,14 @@ using Datadog.Trace.DiagnosticListeners;
 using Datadog.Trace.Sampling;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+#if NETCOREAPP2_1
 using Microsoft.AspNetCore.Hosting.Internal;
+#else
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+#endif
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
@@ -28,7 +33,12 @@ namespace Datadog.Trace.Tests.DiagnosticListeners
     [TracerRestorer]
     public class AspNetCoreDiagnosticObserverTests
     {
-        public static TheoryData<string, bool, string, ExpectedTags> Data =>
+        private const string IndexEndpointName = "Datadog.Trace.Tests.DiagnosticListeners.HomeController.Index (Datadog.Trace.Tests)";
+        private const string ErrorEndpointName = "Datadog.Trace.Tests.DiagnosticListeners.HomeController.Error (Datadog.Trace.Tests)";
+        private const string MyTestEndpointName = "Datadog.Trace.Tests.DiagnosticListeners.MyTestController.Index (Datadog.Trace.Tests)";
+        private const string StatusCodeEndpointName = "Datadog.Trace.Tests.DiagnosticListeners.MyTestController.SetStatusCode (Datadog.Trace.Tests)";
+
+        public static TheoryData<string, bool, string, ExpectedTags> MvcData =>
             new TheoryData<string, bool, string, ExpectedTags>
             {
                 { "/", false, "GET /home/index", ConventionalRouteTags() },
@@ -41,6 +51,25 @@ namespace Datadog.Trace.Tests.DiagnosticListeners
                 { "/statuscode/100", false, "GET /statuscode/{value}", StatusCodeTags() },
                 { "/statuscode/Oops", false, "GET /statuscode/{value}", StatusCodeTags() },
                 { "/statuscode/200", false, "GET /statuscode/{value}", StatusCodeTags() },
+            };
+
+        public static TheoryData<string, bool, string, ExpectedTags> EndpointRoutingData =>
+            new TheoryData<string, bool, string, ExpectedTags>
+            {
+                { "/", false, "GET /home/index", ConventionalRouteTags(endpoint: IndexEndpointName) },
+                { "/Home", false, "GET /home/index", ConventionalRouteTags(endpoint: IndexEndpointName) },
+                { "/Home/Index", false, "GET /home/index", ConventionalRouteTags(endpoint: IndexEndpointName) },
+                { "/Home/Error", true, "GET /home/error", ConventionalRouteTags(action: "error", endpoint: ErrorEndpointName) },
+                { "/MyTest", false, "GET /mytest/index", ConventionalRouteTags(controller: "mytest", endpoint: MyTestEndpointName) },
+                { "/MyTest/index", false, "GET /mytest/index", ConventionalRouteTags(controller: "mytest", endpoint: MyTestEndpointName) },
+                { "/statuscode", false, "GET /statuscode/{value}", StatusCodeTags(endpoint: StatusCodeEndpointName) },
+                { "/statuscode/100", false, "GET /statuscode/{value}", StatusCodeTags(endpoint: StatusCodeEndpointName) },
+                { "/statuscode/Oops", false, "GET /statuscode/{value}", StatusCodeTags(endpoint: StatusCodeEndpointName) },
+                { "/statuscode/200", false, "GET /statuscode/{value}", StatusCodeTags(endpoint: StatusCodeEndpointName) },
+                { "/healthz", false, "GET /healthz", HealthCheckTags() },
+                { "/echo", false, "GET /echo", EchoTags() },
+                { "/echo/123", false, "GET /echo/{value?}", EchoTags() },
+                { "/echo/false", true, "GET /echo/false", null },
             };
 
         [Fact]
@@ -72,8 +101,57 @@ namespace Datadog.Trace.Tests.DiagnosticListeners
             return retValue;
         }
 
+#if !NETCOREAPP2_1
         [Theory]
-        [MemberData(nameof(Data))]
+        [MemberData(nameof(EndpointRoutingData))]
+        public async Task DiagnosticObserver_ForEndpointRouting_SubmitsSpans(string path, bool isError, string resourceName, ExpectedTags expectedTags)
+        {
+            var writer = new AgentWriterStub();
+            var tracer = GetTracer(writer);
+
+            var builder = new WebHostBuilder()
+               .UseStartup<EndpointRoutingStartup>();
+
+            var testServer = new TestServer(builder);
+            var client = testServer.CreateClient();
+            var observers = new List<DiagnosticObserver> { new AspNetCoreDiagnosticObserver(tracer) };
+
+            using (var diagnosticManager = new DiagnosticManager(observers))
+            {
+                diagnosticManager.Start();
+                try
+                {
+                    await client.GetStringAsync(path);
+                }
+                catch (Exception ex)
+                {
+                    Assert.True(isError, $"Unexpected error calling endpoint: {ex}");
+                }
+
+                // The diagnostic observer runs on a separate thread
+                // This gives time for the Stop event to run and to be flushed to the writer
+                var iterations = 10;
+                while (iterations > 0)
+                {
+                    if (writer.Traces.Count > 0)
+                    {
+                        break;
+                    }
+
+                    Thread.Sleep(10);
+                    iterations--;
+                }
+            }
+
+            var trace = Assert.Single(writer.Traces);
+            var span = Assert.Single(trace);
+
+            AssertSpan(span, resourceName, expectedTags);
+        }
+#endif
+
+        [Theory]
+        [MemberData(nameof(MvcData))]
         public async Task DiagnosticObserver_SubmitsSpans(string path, bool isError, string resourceName, ExpectedTags expectedTags)
         {
             var writer = new AgentWriterStub();
@@ -126,7 +204,11 @@ namespace Datadog.Trace.Tests.DiagnosticListeners
 
             IObserver<KeyValuePair<string, object>> observer = new AspNetCoreDiagnosticObserver(tracer);
 
+#if NETCOREAPP2_1
             var context = new HostingApplication.Context { HttpContext = GetHttpContext() };
+#else
+            var context = new { HttpContext = GetHttpContext() };
+#endif
 
             observer.OnNext(new KeyValuePair<string, object>("Microsoft.AspNetCore.Hosting.HttpRequestIn.Start", context));
 
@@ -189,20 +271,39 @@ namespace Datadog.Trace.Tests.DiagnosticListeners
             }
         }
 
-        private static ExpectedTags ConventionalRouteTags(string action = "index", string controller = "home") =>
+        private static ExpectedTags ConventionalRouteTags(
+            string action = "index",
+            string controller = "home",
+            string endpoint = null) =>
             new ExpectedTags
             {
                 { Tags.AspNetRoute, "{controller=home}/{action=index}/{id?}" },
                 { Tags.AspNetController, controller },
                 { Tags.AspNetAction, action },
+                { Tags.AspNetEndpoint, endpoint },
             };
 
-        private static ExpectedTags StatusCodeTags() =>
+        private static ExpectedTags StatusCodeTags(string endpoint = null) =>
             new ExpectedTags
             {
                 { Tags.AspNetRoute, "statuscode/{value=200}" },
                 { Tags.AspNetController, "mytest" },
                 { Tags.AspNetAction, "setstatuscode" },
+                { Tags.AspNetEndpoint, endpoint },
+            };
+
+        private static ExpectedTags HealthCheckTags() =>
+            new ExpectedTags
+            {
+                { Tags.AspNetRoute, "/healthz" },
+                { Tags.AspNetEndpoint, "Custom Health Check" },
+            };
+
+        private static ExpectedTags EchoTags() =>
+            new ExpectedTags
+            {
+                { Tags.AspNetRoute, "/echo/{value:int?}" },
+                { Tags.AspNetEndpoint, "/echo/{value:int?} HTTP: GET" },
             };
 
         public class ExpectedTags : IXunitSerializable, IEnumerable<KeyValuePair<string, string>>
@@ -230,7 +331,11 @@ namespace Datadog.Trace.Tests.DiagnosticListeners
         {
             public void ConfigureServices(IServiceCollection services)
             {
+#if NETCOREAPP2_1
                 services.AddMvc();
+#else
+                services.AddMvc(options => options.EnableEndpointRouting = false);
+#endif
             }
 
             public void Configure(IApplicationBuilder builder)
@@ -242,6 +347,39 @@ namespace Datadog.Trace.Tests.DiagnosticListeners
                 });
             }
         }
+
+#if !NETCOREAPP2_1
+        private class EndpointRoutingStartup
+        {
+            public void ConfigureServices(IServiceCollection services)
+            {
+                services.AddControllers();
+                services.AddHealthChecks();
+                services.AddAuthorization();
+            }
+
+            public void Configure(IApplicationBuilder app)
+            {
+                app.UseRouting();
+                app.UseAuthorization();
+
+                app.UseEndpoints(endpoints =>
+                {
+                    endpoints.MapControllers();
+                    endpoints.MapDefaultControllerRoute();
+                    endpoints.MapHealthChecks("/healthz", new HealthCheckOptions { Predicate = _ => false })
+                             .WithDisplayName("Custom Health Check");
+                    endpoints.MapGet(
+                        "/echo/{value:int?}",
+                        context =>
+                        {
+                            var value = context.GetRouteValue("value")?.ToString();
+                            return context.Response.WriteAsync(value ?? "No value");
+                        });
+                });
+            }
+        }
+#endif
 
         [AttributeUsage(AttributeTargets.Class, Inherited = true)]
         private class TracerRestorerAttribute : BeforeAfterTestAttribute
