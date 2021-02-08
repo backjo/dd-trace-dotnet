@@ -72,6 +72,16 @@ namespace Datadog.Trace.Tests.DiagnosticListeners
                 { "/echo/false", true, "GET /echo/false", null },
             };
 
+        public static TheoryData<string, bool, string, ExpectedTags> RazorPagesData =>
+            new TheoryData<string, bool, string, ExpectedTags>
+            {
+                { "/", false, "GET /", RazorPagesTags(page: "index", route: string.Empty) },
+                { "/Contact", false, "GET /contact", RazorPagesTags(page: "contact") },
+                { "/StatusCode/200", false, "GET /statuscode/{value}", RazorPagesTags(page: "statuscode", route: "statuscode/{value}") },
+                { "/StatusCode/400", true, "GET /statuscode/{value}", RazorPagesTags(page: "statuscode", route: "statuscode/{value}") },
+                { "/StatusCode/200?handler=customhandler", false, "GET /statuscode/{value}", RazorPagesTags(page: "statuscode", route: "statuscode/{value}") },
+            };
+
         [Fact]
         public async Task<string> CompleteDiagnosticObserverTest()
         {
@@ -106,47 +116,7 @@ namespace Datadog.Trace.Tests.DiagnosticListeners
         [MemberData(nameof(EndpointRoutingData))]
         public async Task DiagnosticObserver_ForEndpointRouting_SubmitsSpans(string path, bool isError, string resourceName, ExpectedTags expectedTags)
         {
-            var writer = new AgentWriterStub();
-            var tracer = GetTracer(writer);
-
-            var builder = new WebHostBuilder()
-               .UseStartup<EndpointRoutingStartup>();
-
-            var testServer = new TestServer(builder);
-            var client = testServer.CreateClient();
-            var observers = new List<DiagnosticObserver> { new AspNetCoreDiagnosticObserver(tracer) };
-
-            using (var diagnosticManager = new DiagnosticManager(observers))
-            {
-                diagnosticManager.Start();
-                try
-                {
-                    await client.GetStringAsync(path);
-                }
-                catch (Exception ex)
-                {
-                    Assert.True(isError, $"Unexpected error calling endpoint: {ex}");
-                }
-
-                // The diagnostic observer runs on a separate thread
-                // This gives time for the Stop event to run and to be flushed to the writer
-                var iterations = 10;
-                while (iterations > 0)
-                {
-                    if (writer.Traces.Count > 0)
-                    {
-                        break;
-                    }
-
-                    Thread.Sleep(10);
-                    iterations--;
-                }
-            }
-
-            var trace = Assert.Single(writer.Traces);
-            var span = Assert.Single(trace);
-
-            AssertSpan(span, resourceName, expectedTags);
+            await AssertSpans<EndpointRoutingStartup>(path, isError, resourceName, expectedTags);
         }
 #endif
 
@@ -154,48 +124,17 @@ namespace Datadog.Trace.Tests.DiagnosticListeners
         [MemberData(nameof(MvcData))]
         public async Task DiagnosticObserver_SubmitsSpans(string path, bool isError, string resourceName, ExpectedTags expectedTags)
         {
-            var writer = new AgentWriterStub();
-            var tracer = GetTracer(writer);
-
-            var builder = new WebHostBuilder()
-                .UseStartup<Startup>();
-
-            var testServer = new TestServer(builder);
-            var client = testServer.CreateClient();
-            var observers = new List<DiagnosticObserver> { new AspNetCoreDiagnosticObserver(tracer) };
-
-            using (var diagnosticManager = new DiagnosticManager(observers))
-            {
-                diagnosticManager.Start();
-                try
-                {
-                    await client.GetStringAsync(path);
-                }
-                catch (Exception ex)
-                {
-                    Assert.True(isError, $"Unexpected error calling endpoint: {ex}");
-                }
-
-                // The diagnostic observer runs on a separate thread
-                // This gives time for the Stop event to run and to be flushed to the writer
-                var iterations = 10;
-                while (iterations > 0)
-                {
-                    if (writer.Traces.Count > 0)
-                    {
-                        break;
-                    }
-
-                    Thread.Sleep(10);
-                    iterations--;
-                }
-            }
-
-            var trace = Assert.Single(writer.Traces);
-            var span = Assert.Single(trace);
-
-            AssertSpan(span, resourceName, expectedTags);
+            await AssertSpans<Startup>(path, isError, resourceName, expectedTags);
         }
+
+#if NETCOREAPP2_1
+        [Theory]
+        [MemberData(nameof(RazorPagesData))]
+        public async Task DiagnosticObserver_ForRazorPages_SubmitsSpans(string path, bool isError, string resourceName, ExpectedTags expectedTags)
+        {
+            await AssertSpans<Samples.AspNetCoreRazorPages21.Startup>(path, isError, resourceName, expectedTags);
+        }
+#endif
 
         [Fact]
         public void HttpRequestIn_PopulateSpan()
@@ -224,6 +163,52 @@ namespace Datadog.Trace.Tests.DiagnosticListeners
             Assert.Equal("GET", span.GetTag(Tags.HttpMethod));
             Assert.Equal("localhost", span.GetTag(Tags.HttpRequestHeadersHost));
             Assert.Equal("http://localhost/home/1/action", span.GetTag(Tags.HttpUrl));
+        }
+
+        private static async Task AssertSpans<T>(string path, bool isError, string resourceName, ExpectedTags expectedTags)
+            where T : class
+        {
+            var writer = new AgentWriterStub();
+            var tracer = GetTracer(writer);
+
+            var builder = new WebHostBuilder()
+               .UseStartup<T>();
+
+            var testServer = new TestServer(builder);
+            var client = testServer.CreateClient();
+            var observers = new List<DiagnosticObserver> { new AspNetCoreDiagnosticObserver(tracer) };
+
+            using (var diagnosticManager = new DiagnosticManager(observers))
+            {
+                diagnosticManager.Start();
+                try
+                {
+                    await client.GetStringAsync(path);
+                }
+                catch (Exception ex)
+                {
+                    Assert.True(isError, $"Unexpected error calling endpoint: {ex}");
+                }
+
+                // The diagnostic observer runs on a separate thread
+                // This gives time for the Stop event to run and to be flushed to the writer
+                var iterations = 10;
+                while (iterations > 0)
+                {
+                    if (writer.Traces.Count > 0)
+                    {
+                        break;
+                    }
+
+                    Thread.Sleep(10);
+                    iterations--;
+                }
+            }
+
+            var trace = Assert.Single(writer.Traces);
+            var span = Assert.Single(trace);
+
+            AssertSpan(span, resourceName, expectedTags);
         }
 
         private static Tracer GetTracer(IAgentWriter writer = null)
@@ -304,6 +289,13 @@ namespace Datadog.Trace.Tests.DiagnosticListeners
             {
                 { Tags.AspNetRoute, "/echo/{value:int?}" },
                 { Tags.AspNetEndpoint, "/echo/{value:int?} HTTP: GET" },
+            };
+
+        private static ExpectedTags RazorPagesTags(string page, string route = null) =>
+            new ExpectedTags
+            {
+                { Tags.AspNetRoute, route ?? page },
+                { Tags.AspNetPage, $"/{page}" },
             };
 
         public class ExpectedTags : IXunitSerializable, IEnumerable<KeyValuePair<string, string>>
