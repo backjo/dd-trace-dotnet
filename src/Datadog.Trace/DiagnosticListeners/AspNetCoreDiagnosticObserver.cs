@@ -427,6 +427,7 @@ namespace Datadog.Trace.DiagnosticListeners
                     tags.AspNetAction = actionName;
                     tags.AspNetController = controllerName;
                     tags.AspNetArea = areaName;
+                    tags.AspNetPage = pagePath;
                     tags.AspNetRoute = routeTemplate?.TemplateText.ToLowerInvariant();
                 }
             }
@@ -472,6 +473,9 @@ namespace Datadog.Trace.DiagnosticListeners
                 string areaName = routeValues.TryGetValue("area", out raw)
                                       ? raw?.ToString()?.ToLowerInvariant()
                                       : null;
+                string pagePath = routeValues.TryGetValue("page", out raw)
+                                      ? raw?.ToString()?.ToLowerInvariant()
+                                      : null;
 
                 string resourcePathName = null;
                 if (routePattern is not null)
@@ -503,6 +507,7 @@ namespace Datadog.Trace.DiagnosticListeners
                     tags.AspNetAction = actionName;
                     tags.AspNetController = controllerName;
                     tags.AspNetArea = areaName;
+                    tags.AspNetPage = pagePath;
                     tags.AspNetRoute = routePattern?.RawText?.ToLowerInvariant();
                     tags.AspNetEndpoint = endpoint.DisplayName;
                 }
