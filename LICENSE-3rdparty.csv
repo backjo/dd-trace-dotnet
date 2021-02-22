@@ -14,3 +14,4 @@ opentracing-contrib/csharp-netcore,https://github.com/opentracing-contrib/csharp
 Newtonsoft.Json,https://github.com/JamesNK/Newtonsoft.Json,MIT,Copyright (c) 2007 James Newton-King
 spdlog,https://github.com/gabime/spdlog,MIT,"Copyright (c) 2016 Gabi Melman."
 {fmt},https://github.com/fmtlib/fmt,MIT,"Copyright (c) 2012 - present, Victor Zverovich"
+opentelemetry-dotnet-instrumentation,https://github.com/open-telemetry/opentelemetry-dotnet-instrumentation,Copyright 2020 OpenTelemetry DotNet Instrumentation Authors
