@@ -413,8 +413,9 @@ namespace Datadog.Trace.ClrProfiler.Integrations
         {
             var httpMethod = requestValue.Method.Method;
             var requestUri = requestValue.RequestUri;
+            var tracer = Tracer.Instance;
 
-            using (var scope = ScopeFactory.CreateOutboundHttpScope(Tracer.Instance, httpMethod, requestUri, IntegrationId, out var tags))
+            using (var scope = ScopeFactory.CreateOutboundHttpScope(tracer, httpMethod, requestUri, IntegrationId, out var tags))
             {
                 try
                 {
@@ -432,11 +433,19 @@ namespace Datadog.Trace.ClrProfiler.Integrations
                     var response = task.DuckCast<TaskObjectStruct>().Result;
 
                     // this tag can only be set after the response is returned
-                    int statusCode = response.DuckCast<HttpResponseMessageStruct>().StatusCode;
+                    var responseMessage = response.DuckCast<HttpResponseMessageStruct>();
+                    var responseHeaders = responseMessage.Headers;
+                    int statusCode = responseMessage.StatusCode;
 
                     if (scope != null)
                     {
                         scope.Span.SetHttpStatusCode(statusCode, isServer: false);
+
+                        var tagsFromHeaders = ExtractHeaderTags(responseHeaders, tracer);
+                        foreach (KeyValuePair<string, string> kvp in tagsFromHeaders)
+                        {
+                            scope.Span.SetTag(kvp.Key, kvp.Value);
+                        }
                     }
 
                     return response;
@@ -498,7 +507,7 @@ namespace Datadog.Trace.ClrProfiler.Integrations
                 && reportedType.FullName.Equals("System.Net.Http.SocketsHttpHandler", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static bool IsTracingEnabled(IRequestHeaders headers)
+        private static bool IsTracingEnabled(IHeaders headers)
         {
             if (headers.TryGetValues(HttpHeaderNames.TracingEnabled, out var headerValues))
             {
@@ -525,6 +534,29 @@ namespace Datadog.Trace.ClrProfiler.Integrations
             return true;
         }
 
+        private static IEnumerable<KeyValuePair<string, string>> ExtractHeaderTags(IHeaders responseHeaders, IDatadogTracer tracer)
+        {
+            var settings = tracer.Settings;
+
+            if (!settings.HeaderTags.IsEmpty())
+            {
+                try
+                {
+                    // extract propagation details from http headers
+                    if (responseHeaders != null)
+                    {
+                        return SpanContextPropagator.Instance.ExtractHeaderTags(new HttpHeadersCollection(responseHeaders), settings.HeaderTags);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "Error extracting propagated HTTP headers.");
+                }
+            }
+
+            return Enumerable.Empty<KeyValuePair<string, string>>();
+        }
+
         /********************
          * Duck Typing Types
          */
@@ -539,7 +571,7 @@ namespace Datadog.Trace.ClrProfiler.Integrations
 
             public Uri RequestUri;
 
-            public IRequestHeaders Headers;
+            public IHeaders Headers;
         }
 
         [DuckCopy]
@@ -548,19 +580,12 @@ namespace Datadog.Trace.ClrProfiler.Integrations
             public string Method;
         }
 
-        public interface IRequestHeaders
-        {
-            bool TryGetValues(string name, out IEnumerable<string> values);
-
-            bool Remove(string name);
-
-            void Add(string name, string value);
-        }
-
         [DuckCopy]
         public struct HttpResponseMessageStruct
         {
             public int StatusCode;
+
+            public IHeaders Headers;
         }
 
         [DuckCopy]
@@ -569,11 +594,20 @@ namespace Datadog.Trace.ClrProfiler.Integrations
             public object Result;
         }
 
+        public interface IHeaders
+        {
+            bool TryGetValues(string name, out IEnumerable<string> values);
+
+            bool Remove(string name);
+
+            void Add(string name, string value);
+        }
+
         internal readonly struct HttpHeadersCollection : IHeadersCollection
         {
-            private readonly IRequestHeaders _headers;
+            private readonly IHeaders _headers;
 
-            public HttpHeadersCollection(IRequestHeaders headers)
+            public HttpHeadersCollection(IHeaders headers)
             {
                 _headers = headers ?? throw new ArgumentNullException(nameof(headers));
             }
