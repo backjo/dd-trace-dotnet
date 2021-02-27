@@ -5,7 +5,7 @@ namespace Datadog.Trace.ClrProfiler.AutoInstrumentation.Http.WinHttpHandler
     /// <summary>
     /// RequestHeaders interface for ducktyping
     /// </summary>
-    public interface IRequestHeaders
+    public interface IHeaders
     {
         /// <summary>
         /// Try get values from the headers

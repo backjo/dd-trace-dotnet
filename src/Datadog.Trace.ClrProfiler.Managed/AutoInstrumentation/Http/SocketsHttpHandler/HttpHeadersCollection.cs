@@ -7,9 +7,9 @@ namespace Datadog.Trace.ClrProfiler.AutoInstrumentation.Http.SocketsHttpHandler
 {
     internal readonly struct HttpHeadersCollection : IHeadersCollection
     {
-        private readonly IRequestHeaders _headers;
+        private readonly IHeaders _headers;
 
-        public HttpHeadersCollection(IRequestHeaders headers)
+        public HttpHeadersCollection(IHeaders headers)
         {
             _headers = headers ?? throw new ArgumentNullException(nameof(headers));
         }

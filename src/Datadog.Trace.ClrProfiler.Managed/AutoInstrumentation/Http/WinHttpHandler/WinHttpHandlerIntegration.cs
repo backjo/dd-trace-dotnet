@@ -1,9 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using Datadog.Trace.ClrProfiler.CallTarget;
 using Datadog.Trace.Configuration;
 using Datadog.Trace.ExtensionMethods;
+using Datadog.Trace.Logging;
 using Datadog.Trace.Tagging;
 
 namespace Datadog.Trace.ClrProfiler.AutoInstrumentation.Http.WinHttpHandler
@@ -25,6 +27,8 @@ namespace Datadog.Trace.ClrProfiler.AutoInstrumentation.Http.WinHttpHandler
         private const string IntegrationName = nameof(IntegrationIds.HttpMessageHandler);
         private static readonly IntegrationInfo IntegrationId = IntegrationRegistry.GetIntegrationInfo(IntegrationName);
         private static readonly IntegrationInfo WinHttpHandlerIntegrationId = IntegrationRegistry.GetIntegrationInfo(nameof(IntegrationIds.WinHttpHandler));
+
+        private static readonly IDatadogLogger Log = DatadogLogging.GetLoggerFor(typeof(WinHttpHandlerIntegration));
 
         /// <summary>
         /// OnMethodBegin callback
@@ -79,6 +83,12 @@ namespace Datadog.Trace.ClrProfiler.AutoInstrumentation.Http.WinHttpHandler
             {
                 scope.Span.SetHttpStatusCode(responseMessage.StatusCode, isServer: false);
 
+                var tagsFromHeaders = ExtractHeaderTags(responseMessage.Headers, Tracer.Instance);
+                foreach (KeyValuePair<string, string> kvp in tagsFromHeaders)
+                {
+                    scope.Span.SetTag(kvp.Key, kvp.Value);
+                }
+
                 if (exception != null)
                 {
                     scope.Span.SetException(exception);
@@ -92,7 +102,7 @@ namespace Datadog.Trace.ClrProfiler.AutoInstrumentation.Http.WinHttpHandler
             return responseMessage;
         }
 
-        private static bool IsTracingEnabled(IRequestHeaders headers)
+        private static bool IsTracingEnabled(IHeaders headers)
         {
             if (!Tracer.Instance.Settings.IsIntegrationEnabled(WinHttpHandlerIntegrationId, defaultValue: false))
             {
@@ -122,6 +132,29 @@ namespace Datadog.Trace.ClrProfiler.AutoInstrumentation.Http.WinHttpHandler
             }
 
             return true;
+        }
+
+        private static IEnumerable<KeyValuePair<string, string>> ExtractHeaderTags(IHeaders responseHeaders, IDatadogTracer tracer)
+        {
+            var settings = tracer.Settings;
+
+            if (!settings.HeaderTags.IsEmpty())
+            {
+                try
+                {
+                    // extract propagation details from http headers
+                    if (responseHeaders != null)
+                    {
+                        return SpanContextPropagator.Instance.ExtractHeaderTags(new HttpHeadersCollection(responseHeaders), settings.HeaderTags);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "Error extracting propagated HTTP headers.");
+                }
+            }
+
+            return Enumerable.Empty<KeyValuePair<string, string>>();
         }
     }
 }

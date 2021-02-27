@@ -9,5 +9,10 @@ namespace Datadog.Trace.ClrProfiler.AutoInstrumentation.Http.SocketsHttpHandler
         /// Gets the status code of the http response
         /// </summary>
         int StatusCode { get; }
+
+        /// <summary>
+        /// Gets the response headers
+        /// </summary>
+        IHeaders Headers { get; }
     }
 }

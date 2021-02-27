@@ -20,6 +20,6 @@ namespace Datadog.Trace.ClrProfiler.AutoInstrumentation.Http.WinHttpHandler
         /// <summary>
         /// Gets the request headers
         /// </summary>
-        IRequestHeaders Headers { get; }
+        IHeaders Headers { get; }
     }
 }
