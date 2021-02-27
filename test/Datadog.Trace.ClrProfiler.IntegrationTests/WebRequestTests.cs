@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Linq;
 using Datadog.Core.Tools;
 using Datadog.Trace.ClrProfiler.IntegrationTests.Helpers;
+using Datadog.Trace.Configuration;
 using Datadog.Trace.TestHelpers;
 using Xunit;
 using Xunit.Abstractions;
@@ -12,9 +13,13 @@ namespace Datadog.Trace.ClrProfiler.IntegrationTests
     [Collection(nameof(WebRequestTests))]
     public class WebRequestTests : TestHelper
     {
+        protected const string HeaderName = "test-server-success-header";
+        protected const string HeaderTagName = "test-server-success-tag";
+
         public WebRequestTests(ITestOutputHelper output)
             : base("WebRequest", output)
         {
+            SetEnvironmentVariable(ConfigurationKeys.HeaderTags, $"{HeaderName}:{HeaderTagName}");
             SetServiceVersion("1.0.0");
         }
 
@@ -56,6 +61,7 @@ namespace Datadog.Trace.ClrProfiler.IntegrationTests
                     Assert.Equal(SpanTypes.Http, span.Type);
                     Assert.True(string.Equals(span.Tags[Tags.InstrumentationName], "WebRequest") || string.Equals(span.Tags[Tags.InstrumentationName], "HttpMessageHandler"));
                     Assert.False(span.Tags?.ContainsKey(Tags.Version), "External service span should not have service version tag.");
+                    Assert.Equal("true", span.Tags[HeaderTagName]); // Assert the DD_TRACE_HEADER_TAGS reports response headers for client spans
                 }
 
                 var firstSpan = spans.First();

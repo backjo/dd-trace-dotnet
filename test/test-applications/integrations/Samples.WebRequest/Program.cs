@@ -143,7 +143,14 @@ namespace Samples.WebRequest
                     byte[] responseBytes = Utf8.GetBytes(ResponseContent);
                     context.Response.ContentEncoding = Utf8;
                     context.Response.ContentLength64 = responseBytes.Length;
+                    context.Response.AddHeader("test-server-success-header", "true");
                     context.Response.OutputStream.Write(responseBytes, 0, responseBytes.Length);
+
+                    foreach (string headerName in context.Response.Headers)
+                    {
+                        string headerValue = context.Response.Headers[headerName];
+                        Console.WriteLine($"[HttpListener] response header: {headerName}={headerValue}");
+                    }
 
                     // we must close the response
                     context.Response.Close();
