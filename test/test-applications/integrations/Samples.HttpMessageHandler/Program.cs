@@ -176,8 +176,19 @@ namespace Samples.HttpMessageHandler
                     if (context.Request.RawUrl == "/Samples.HttpMessageHandler/HttpErrorCode")
                     {
                         context.Response.StatusCode = 502;
+                        context.Response.AddHeader("test-server-success-header", "false");
+                    }
+                    else
+                    {
+                        context.Response.AddHeader("test-server-success-header", "true");
                     }
                     context.Response.OutputStream.Write(responseBytes, 0, responseBytes.Length);
+
+                    foreach (string headerName in context.Response.Headers)
+                    {
+                        string headerValue = context.Response.Headers[headerName];
+                        Console.WriteLine($"[HttpListener] response header: {headerName}={headerValue}");
+                    }
 
                     // we must close the response
                     context.Response.Close();

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using Datadog.Core.Tools;
 using Datadog.Trace.ClrProfiler.IntegrationTests.Helpers;
+using Datadog.Trace.Configuration;
 using Datadog.Trace.TestHelpers;
 using Xunit;
 using Xunit.Abstractions;
@@ -14,9 +15,13 @@ namespace Datadog.Trace.ClrProfiler.IntegrationTests
     [CollectionDefinition(nameof(HttpMessageHandlerTests), DisableParallelization = true)]
     public class HttpMessageHandlerTests : TestHelper
     {
+        protected const string HeaderName = "test-server-success-header";
+        protected const string HeaderTagName = "test-server-success-tag";
+
         public HttpMessageHandlerTests(ITestOutputHelper output)
             : base("HttpMessageHandler", output)
         {
+            SetEnvironmentVariable(ConfigurationKeys.HeaderTags, $"{HeaderName}:{HeaderTagName}");
             SetEnvironmentVariable("DD_HTTP_CLIENT_ERROR_STATUSES", "400-499, 502,-343,11-53, 500-500-200");
             SetServiceVersion("1.0.0");
         }
@@ -85,6 +90,11 @@ namespace Datadog.Trace.ClrProfiler.IntegrationTests
                     if (span.Tags[Tags.HttpStatusCode] == "502")
                     {
                         Assert.Equal(1, span.Error);
+                        Assert.Equal("false", span.Tags[HeaderTagName]); // Assert the DD_TRACE_HEADER_TAGS reports response headers for client spans
+                    }
+                    else
+                    {
+                        Assert.Equal("true", span.Tags[HeaderTagName]); // Assert the DD_TRACE_HEADER_TAGS reports response headers for client spans
                     }
                 }
 
