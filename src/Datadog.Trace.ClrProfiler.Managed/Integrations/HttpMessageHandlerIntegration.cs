@@ -468,8 +468,9 @@ namespace Datadog.Trace.ClrProfiler.Integrations
         {
             var httpMethod = requestValue.Method.Method;
             var requestUri = requestValue.RequestUri;
+            var tracer = Tracer.Instance;
 
-            using (var scope = ScopeFactory.CreateOutboundHttpScope(Tracer.Instance, httpMethod, requestUri, IntegrationId, out var tags))
+            using (var scope = ScopeFactory.CreateOutboundHttpScope(tracer, httpMethod, requestUri, IntegrationId, out var tags))
             {
                 try
                 {
@@ -484,11 +485,19 @@ namespace Datadog.Trace.ClrProfiler.Integrations
                     var response = send(handler, request, cancellationToken);
 
                     // this tag can only be set after the response is returned
-                    int statusCode = response.DuckCast<HttpResponseMessageStruct>().StatusCode;
+                    var responseMessage = response.DuckCast<HttpResponseMessageStruct>();
+                    var responseHeaders = responseMessage.Headers;
+                    int statusCode = responseMessage.StatusCode;
 
                     if (scope != null)
                     {
                         scope.Span.SetHttpStatusCode(statusCode, isServer: false);
+
+                        var tagsFromHeaders = ExtractHeaderTags(responseHeaders, tracer);
+                        foreach (KeyValuePair<string, string> kvp in tagsFromHeaders)
+                        {
+                            scope.Span.SetTag(kvp.Key, kvp.Value);
+                        }
                     }
 
                     return response;
