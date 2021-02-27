@@ -16,7 +16,7 @@
           "DD_VERSION": "1.0.0",
           "DD_TRACE_HEADER_TAGS": "test-server-success-header:test-server-success-tag"
         },
-        "nativeDebugging": false
+        "nativeDebugging": true
       }
     }
   }
