@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using Datadog.Trace.ClrProfiler.Emit;
@@ -160,8 +162,8 @@ namespace Datadog.Trace.ClrProfiler.Integrations
 
             // Check if any headers were injected by a previous call to GetRequestStream
             var spanContext = SpanContextPropagator.Instance.Extract(request.Headers.Wrap());
-
-            using (var scope = ScopeFactory.CreateOutboundHttpScope(Tracer.Instance, request.Method, request.RequestUri, IntegrationId, out var tags, spanContext?.SpanId))
+            var tracer = Tracer.Instance;
+            using (var scope = ScopeFactory.CreateOutboundHttpScope(tracer, request.Method, request.RequestUri, IntegrationId, out var tags, spanContext?.SpanId))
             {
                 try
                 {
@@ -176,6 +178,12 @@ namespace Datadog.Trace.ClrProfiler.Integrations
                     if (scope != null && response is HttpWebResponse webResponse)
                     {
                         scope.Span.SetHttpStatusCode((int)webResponse.StatusCode, isServer: false);
+
+                        var tagsFromHeaders = ExtractHeaderTags(webResponse.Headers, tracer);
+                        foreach (KeyValuePair<string, string> kvp in tagsFromHeaders)
+                        {
+                            scope.Span.SetTag(kvp.Key, kvp.Value);
+                        }
                     }
 
                     return response;
@@ -246,7 +254,8 @@ namespace Datadog.Trace.ClrProfiler.Integrations
                 return await originalMethod(webRequest).ConfigureAwait(false);
             }
 
-            using (var scope = ScopeFactory.CreateOutboundHttpScope(Tracer.Instance, webRequest.Method, webRequest.RequestUri, IntegrationId, out var tags))
+            var tracer = Tracer.Instance;
+            using (var scope = ScopeFactory.CreateOutboundHttpScope(tracer, webRequest.Method, webRequest.RequestUri, IntegrationId, out var tags))
             {
                 try
                 {
@@ -261,6 +270,12 @@ namespace Datadog.Trace.ClrProfiler.Integrations
                     if (scope != null && response is HttpWebResponse webResponse)
                     {
                         scope.Span.SetHttpStatusCode((int)webResponse.StatusCode, isServer: false);
+
+                        var tagsFromHeaders = ExtractHeaderTags(webResponse.Headers, tracer);
+                        foreach (KeyValuePair<string, string> kvp in tagsFromHeaders)
+                        {
+                            scope.Span.SetTag(kvp.Key, kvp.Value);
+                        }
                     }
 
                     return response;
@@ -278,6 +293,29 @@ namespace Datadog.Trace.ClrProfiler.Integrations
             // check if tracing is disabled for this request via http header
             string value = request.Headers[HttpHeaderNames.TracingEnabled];
             return !string.Equals(value, "false", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static IEnumerable<KeyValuePair<string, string>> ExtractHeaderTags(WebHeaderCollection responseHeaders, IDatadogTracer tracer)
+        {
+            var settings = tracer.Settings;
+
+            if (!settings.HeaderTags.IsEmpty())
+            {
+                try
+                {
+                    // extract propagation details from http headers
+                    if (responseHeaders != null)
+                    {
+                        return SpanContextPropagator.Instance.ExtractHeaderTags(responseHeaders.Wrap(), settings.HeaderTags);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "Error extracting propagated HTTP headers.");
+                }
+            }
+
+            return Enumerable.Empty<KeyValuePair<string, string>>();
         }
     }
 }
