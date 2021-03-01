@@ -1,6 +1,7 @@
 using System;
 using System.Net;
 using Datadog.Trace.ClrProfiler.CallTarget;
+using Datadog.Trace.ClrProfiler.Integrations.Http;
 using Datadog.Trace.ExtensionMethods;
 
 namespace Datadog.Trace.ClrProfiler.AutoInstrumentation.Http.WebRequest
@@ -58,7 +59,7 @@ namespace Datadog.Trace.ClrProfiler.AutoInstrumentation.Http.WebRequest
                 if (returnValue is HttpWebResponse response)
                 {
                     state.Scope.Span.SetHttpStatusCode((int)response.StatusCode, isServer: false);
-                    state.Scope.ExtractHeaderTags(response.Headers.Wrap(), Tracer.Instance);
+                    state.Scope.Span.ApplyHeaderTags(response.Headers.Wrap(), Tracer.Instance.Settings.HeaderTags);
                 }
             }
 

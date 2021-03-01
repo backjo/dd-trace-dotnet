@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using Datadog.Trace.ClrProfiler.CallTarget;
+using Datadog.Trace.ClrProfiler.Integrations.Http;
 using Datadog.Trace.Configuration;
 using Datadog.Trace.ExtensionMethods;
 using Datadog.Trace.Tagging;
@@ -71,7 +72,7 @@ namespace Datadog.Trace.ClrProfiler.AutoInstrumentation.Http.WinHttpHandler
             if (state.Scope != null)
             {
                 state.Scope.Span.SetHttpStatusCode(responseMessage.StatusCode, isServer: false);
-                state.Scope.ExtractHeaderTags(new HttpHeadersCollection(responseMessage.Headers), Tracer.Instance);
+                state.Scope.Span.ApplyHeaderTags(new HttpHeadersCollection(responseMessage.Headers), Tracer.Instance.Settings.HeaderTags);
             }
 
             state.Scope.DisposeWithException(exception);
