@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Datadog.Trace.ClrProfiler.Emit;
 using Datadog.Trace.ClrProfiler.Helpers;
+using Datadog.Trace.ClrProfiler.Integrations.Http;
 using Datadog.Trace.Configuration;
 using Datadog.Trace.DuckTyping;
 using Datadog.Trace.ExtensionMethods;
@@ -440,12 +441,7 @@ namespace Datadog.Trace.ClrProfiler.Integrations
                     if (scope != null)
                     {
                         scope.Span.SetHttpStatusCode(statusCode, isServer: false);
-
-                        var tagsFromHeaders = ExtractHeaderTags(responseHeaders, tracer);
-                        foreach (KeyValuePair<string, string> kvp in tagsFromHeaders)
-                        {
-                            scope.Span.SetTag(kvp.Key, kvp.Value);
-                        }
+                        scope.Span.ApplyHeaderTags(new HttpHeadersCollection(responseHeaders), tracer.Settings.HeaderTags);
                     }
 
                     return response;
@@ -492,12 +488,7 @@ namespace Datadog.Trace.ClrProfiler.Integrations
                     if (scope != null)
                     {
                         scope.Span.SetHttpStatusCode(statusCode, isServer: false);
-
-                        var tagsFromHeaders = ExtractHeaderTags(responseHeaders, tracer);
-                        foreach (KeyValuePair<string, string> kvp in tagsFromHeaders)
-                        {
-                            scope.Span.SetTag(kvp.Key, kvp.Value);
-                        }
+                        scope.Span.ApplyHeaderTags(new HttpHeadersCollection(responseHeaders), tracer.Settings.HeaderTags);
                     }
 
                     return response;
@@ -541,29 +532,6 @@ namespace Datadog.Trace.ClrProfiler.Integrations
             }
 
             return true;
-        }
-
-        private static IEnumerable<KeyValuePair<string, string>> ExtractHeaderTags(IHeaders responseHeaders, IDatadogTracer tracer)
-        {
-            var settings = tracer.Settings;
-
-            if (!settings.HeaderTags.IsEmpty())
-            {
-                try
-                {
-                    // extract propagation details from http headers
-                    if (responseHeaders != null)
-                    {
-                        return SpanContextPropagator.Instance.ExtractHeaderTags(new HttpHeadersCollection(responseHeaders), settings.HeaderTags);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Log.Error(ex, "Error extracting propagated HTTP headers.");
-                }
-            }
-
-            return Enumerable.Empty<KeyValuePair<string, string>>();
         }
 
         /********************

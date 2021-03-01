@@ -1,10 +1,9 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using Datadog.Trace.ClrProfiler.Emit;
+using Datadog.Trace.ClrProfiler.Integrations.Http;
 using Datadog.Trace.Configuration;
 using Datadog.Trace.ExtensionMethods;
 using Datadog.Trace.Logging;
@@ -178,12 +177,7 @@ namespace Datadog.Trace.ClrProfiler.Integrations
                     if (scope != null && response is HttpWebResponse webResponse)
                     {
                         scope.Span.SetHttpStatusCode((int)webResponse.StatusCode, isServer: false);
-
-                        var tagsFromHeaders = ExtractHeaderTags(webResponse.Headers, tracer);
-                        foreach (KeyValuePair<string, string> kvp in tagsFromHeaders)
-                        {
-                            scope.Span.SetTag(kvp.Key, kvp.Value);
-                        }
+                        scope.Span.ApplyHeaderTags(webResponse.Headers.Wrap(), tracer.Settings.HeaderTags);
                     }
 
                     return response;
@@ -270,12 +264,7 @@ namespace Datadog.Trace.ClrProfiler.Integrations
                     if (scope != null && response is HttpWebResponse webResponse)
                     {
                         scope.Span.SetHttpStatusCode((int)webResponse.StatusCode, isServer: false);
-
-                        var tagsFromHeaders = ExtractHeaderTags(webResponse.Headers, tracer);
-                        foreach (KeyValuePair<string, string> kvp in tagsFromHeaders)
-                        {
-                            scope.Span.SetTag(kvp.Key, kvp.Value);
-                        }
+                        scope.Span.ApplyHeaderTags(webResponse.Headers.Wrap(), tracer.Settings.HeaderTags);
                     }
 
                     return response;
@@ -293,29 +282,6 @@ namespace Datadog.Trace.ClrProfiler.Integrations
             // check if tracing is disabled for this request via http header
             string value = request.Headers[HttpHeaderNames.TracingEnabled];
             return !string.Equals(value, "false", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static IEnumerable<KeyValuePair<string, string>> ExtractHeaderTags(WebHeaderCollection responseHeaders, IDatadogTracer tracer)
-        {
-            var settings = tracer.Settings;
-
-            if (!settings.HeaderTags.IsEmpty())
-            {
-                try
-                {
-                    // extract propagation details from http headers
-                    if (responseHeaders != null)
-                    {
-                        return SpanContextPropagator.Instance.ExtractHeaderTags(responseHeaders.Wrap(), settings.HeaderTags);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Log.Error(ex, "Error extracting propagated HTTP headers.");
-                }
-            }
-
-            return Enumerable.Empty<KeyValuePair<string, string>>();
         }
     }
 }
