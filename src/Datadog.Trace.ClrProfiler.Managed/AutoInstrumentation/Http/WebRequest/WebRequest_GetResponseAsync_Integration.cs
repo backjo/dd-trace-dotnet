@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Net;
 using Datadog.Trace.ClrProfiler.CallTarget;
 using Datadog.Trace.ExtensionMethods;
@@ -59,17 +58,11 @@ namespace Datadog.Trace.ClrProfiler.AutoInstrumentation.Http.WebRequest
                 if (returnValue is HttpWebResponse response)
                 {
                     state.Scope.Span.SetHttpStatusCode((int)response.StatusCode, isServer: false);
-
-                    var tagsFromHeaders = WebRequestCommon.ExtractHeaderTags(response.Headers, Tracer.Instance);
-                    foreach (KeyValuePair<string, string> kvp in tagsFromHeaders)
-                    {
-                        state.Scope.Span.SetTag(kvp.Key, kvp.Value);
-                    }
+                    state.Scope.ExtractHeaderTags(response.Headers.Wrap(), Tracer.Instance);
                 }
-
-                state.Scope.DisposeWithException(exception);
             }
 
+            state.Scope.DisposeWithException(exception);
             return returnValue;
         }
     }

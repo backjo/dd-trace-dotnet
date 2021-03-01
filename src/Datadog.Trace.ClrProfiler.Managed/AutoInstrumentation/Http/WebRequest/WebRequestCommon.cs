@@ -1,11 +1,8 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using Datadog.Trace.ClrProfiler.CallTarget;
 using Datadog.Trace.Configuration;
 using Datadog.Trace.ExtensionMethods;
-using Datadog.Trace.Logging;
 
 namespace Datadog.Trace.ClrProfiler.AutoInstrumentation.Http.WebRequest
 {
@@ -25,8 +22,6 @@ namespace Datadog.Trace.ClrProfiler.AutoInstrumentation.Http.WebRequest
 
         internal const string IntegrationName = nameof(IntegrationIds.WebRequest);
         internal static readonly IntegrationInfo IntegrationId = IntegrationRegistry.GetIntegrationInfo(IntegrationName);
-
-        private static readonly IDatadogLogger Log = DatadogLogging.GetLoggerFor(typeof(WebRequestCommon));
 
         /// <summary>
         /// OnMethodBegin callback
@@ -70,29 +65,6 @@ namespace Datadog.Trace.ClrProfiler.AutoInstrumentation.Http.WebRequest
             // check if tracing is disabled for this request via http header
             string value = request.Headers[HttpHeaderNames.TracingEnabled];
             return !string.Equals(value, "false", StringComparison.OrdinalIgnoreCase);
-        }
-
-        internal static IEnumerable<KeyValuePair<string, string>> ExtractHeaderTags(WebHeaderCollection responseHeaders, IDatadogTracer tracer)
-        {
-            var settings = tracer.Settings;
-
-            if (!settings.HeaderTags.IsEmpty())
-            {
-                try
-                {
-                    // extract propagation details from http headers
-                    if (responseHeaders != null)
-                    {
-                        return SpanContextPropagator.Instance.ExtractHeaderTags(responseHeaders.Wrap(), settings.HeaderTags);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Log.Error(ex, "Error extracting propagated HTTP headers.");
-                }
-            }
-
-            return Enumerable.Empty<KeyValuePair<string, string>>();
         }
     }
 }

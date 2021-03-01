@@ -1,11 +1,9 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using Datadog.Trace.ClrProfiler.CallTarget;
 using Datadog.Trace.Configuration;
 using Datadog.Trace.ExtensionMethods;
-using Datadog.Trace.Logging;
 using Datadog.Trace.Tagging;
 
 namespace Datadog.Trace.ClrProfiler.AutoInstrumentation.Http.SocketsHttpHandler
@@ -15,8 +13,6 @@ namespace Datadog.Trace.ClrProfiler.AutoInstrumentation.Http.SocketsHttpHandler
         private const string IntegrationName = nameof(IntegrationIds.HttpMessageHandler);
         private static readonly IntegrationInfo IntegrationId = IntegrationRegistry.GetIntegrationInfo(IntegrationName);
         private static readonly IntegrationInfo SocketHandlerIntegrationId = IntegrationRegistry.GetIntegrationInfo(nameof(IntegrationIds.HttpSocketsHandler));
-
-        private static readonly IDatadogLogger Log = DatadogLogging.GetLoggerFor(typeof(SocketsHttpHandlerCommon));
 
         public static CallTargetState OnMethodBegin<TTarget, TRequest>(TTarget instance, TRequest requestMessage, CancellationToken cancellationToken)
             where TRequest : IHttpRequestMessage
@@ -41,33 +37,13 @@ namespace Datadog.Trace.ClrProfiler.AutoInstrumentation.Http.SocketsHttpHandler
         public static TResponse OnMethodEnd<TTarget, TResponse>(TTarget instance, TResponse responseMessage, Exception exception, CallTargetState state)
             where TResponse : IHttpResponseMessage
         {
-            Scope scope = state.Scope;
-
-            if (scope is null)
+            if (state.Scope != null)
             {
-                return responseMessage;
+                state.Scope.Span.SetHttpStatusCode(responseMessage.StatusCode, isServer: false);
+                state.Scope.ExtractHeaderTags(new HttpHeadersCollection(responseMessage.Headers), Tracer.Instance);
             }
 
-            try
-            {
-                scope.Span.SetHttpStatusCode(responseMessage.StatusCode, isServer: false);
-
-                var tagsFromHeaders = ExtractHeaderTags(responseMessage.Headers, Tracer.Instance);
-                foreach (KeyValuePair<string, string> kvp in tagsFromHeaders)
-                {
-                    scope.Span.SetTag(kvp.Key, kvp.Value);
-                }
-
-                if (exception != null)
-                {
-                    scope.Span.SetException(exception);
-                }
-            }
-            finally
-            {
-                scope.Dispose();
-            }
-
+            state.Scope.DisposeWithException(exception);
             return responseMessage;
         }
 
@@ -101,29 +77,6 @@ namespace Datadog.Trace.ClrProfiler.AutoInstrumentation.Http.SocketsHttpHandler
             }
 
             return true;
-        }
-
-        private static IEnumerable<KeyValuePair<string, string>> ExtractHeaderTags(IHeaders responseHeaders, IDatadogTracer tracer)
-        {
-            var settings = tracer.Settings;
-
-            if (!settings.HeaderTags.IsEmpty())
-            {
-                try
-                {
-                    // extract propagation details from http headers
-                    if (responseHeaders != null)
-                    {
-                        return SpanContextPropagator.Instance.ExtractHeaderTags(new HttpHeadersCollection(responseHeaders), settings.HeaderTags);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Log.Error(ex, "Error extracting propagated HTTP headers.");
-                }
-            }
-
-            return Enumerable.Empty<KeyValuePair<string, string>>();
         }
     }
 }
