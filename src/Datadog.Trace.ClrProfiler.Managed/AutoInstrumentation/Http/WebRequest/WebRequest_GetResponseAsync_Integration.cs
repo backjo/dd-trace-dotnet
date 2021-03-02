@@ -61,9 +61,10 @@ namespace Datadog.Trace.ClrProfiler.AutoInstrumentation.Http.WebRequest
                     state.Scope.Span.SetHttpStatusCode((int)response.StatusCode, isServer: false);
                     state.Scope.Span.ApplyHeaderTags(response.Headers.Wrap(), Tracer.Instance.Settings.HeaderTags);
                 }
+
+                state.Scope.DisposeWithException(exception);
             }
 
-            state.Scope.DisposeWithException(exception);
             return returnValue;
         }
     }
