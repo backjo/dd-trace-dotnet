@@ -329,7 +329,7 @@ namespace Datadog.Trace.TestHelpers
         {
             using (var aggregatePipeServer = new AggregatePipeServer(_tracesPipeName))
             {
-                EventHandler<MessageReceivedEventArgs> receivedHandler = (sender, args) =>
+                void ReceivedHandler(object sender, MessageReceivedEventArgs args)
                 {
                     try
                     {
@@ -348,9 +348,12 @@ namespace Datadog.Trace.TestHelpers
 
                             lock (this)
                             {
+                                // De-duplication in case of retry
+                                var tracesToAdd = spans.Where(s => Spans.All(e => e.TraceId != s.First().TraceId));
+
                                 // we only need to lock when replacing the span collection,
                                 // not when reading it because it is immutable
-                                Spans = Spans.AddRange(spans.SelectMany(trace => trace));
+                                Spans = Spans.AddRange(tracesToAdd.SelectMany(trace => trace));
                                 RequestHeaders = RequestHeaders.Add(new NameValueCollection(args.Message.Headers));
                             }
                         }
@@ -360,9 +363,9 @@ namespace Datadog.Trace.TestHelpers
                         // Can't deserialize!
                         Console.WriteLine(ex);
                     }
-                };
+                }
 
-                aggregatePipeServer.MessageReceivedEvent += receivedHandler;
+                aggregatePipeServer.MessageReceivedEvent += ReceivedHandler;
 
                 aggregatePipeServer.Start();
 
@@ -371,7 +374,7 @@ namespace Datadog.Trace.TestHelpers
                     Thread.Sleep(10);
                 }
 
-                aggregatePipeServer.MessageReceivedEvent -= receivedHandler;
+                aggregatePipeServer.MessageReceivedEvent -= ReceivedHandler;
             }
         }
 
