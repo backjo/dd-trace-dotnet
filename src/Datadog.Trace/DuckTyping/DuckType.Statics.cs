@@ -29,13 +29,64 @@ namespace Datadog.Trace.DuckTyping
         private static readonly PropertyInfo DuckTypeInstancePropertyInfo = typeof(IDuckType).GetProperty(nameof(IDuckType.Instance));
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         private static readonly MethodInfo _methodBuilderGetToken = typeof(MethodBuilder).GetMethod("GetToken", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+        private static readonly ConcurrentDictionary<object, ModuleBuilder> ModuleBuilderCache = new ConcurrentDictionary<object, ModuleBuilder>();
 
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        private static ModuleBuilder _moduleBuilder = null;
-        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        private static AssemblyBuilder _assemblyBuilder = null;
-        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         private static long _typeCount = 0;
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+        private static long _dynamicMethodCount = 0;
+
+        private static object[] loadContextArgs = new[] { typeof(ModuleBuilderHelper).Assembly.Location };
+
+        internal static ModuleBuilder TargetTypeToModuleBuilder(Type targetType)
+        {
+#if NETFRAMEWORK
+            return ModuleBuilderHelper.GetModuleBuilder();
+#else
+            // Do runtime check for !.NET Framework
+
+            // Get AssemblyLoadContext
+            Type assemblyLoadContextType = Type.GetType("System.Runtime.Loader.AssemblyLoadContext, System.Runtime.Loader", false);
+            if (assemblyLoadContextType is null)
+            {
+                // Default behavior: Return ModuleBuilder from the already loaded Datadog.Trace assembly
+                return ModuleBuilderHelper.GetModuleBuilder();
+            }
+
+            MethodInfo getLoadContextMethod = assemblyLoadContextType?.GetMethod("GetLoadContext", BindingFlags.Public | BindingFlags.Static);
+            MethodInfo getDefaultMethod = assemblyLoadContextType?.GetMethod("get_Default", BindingFlags.Public | BindingFlags.Static);
+
+            // Invoke System.Runtime.Loader.AssemblyLoadContext.GetLoadContext(Assembly)
+            object targetAssemblyLoadContext = getLoadContextMethod?.Invoke(null, new[] { targetType.Assembly }) ?? null;
+
+            // Invoke System.Runtime.Loader.AssemblyLoadContext.Default property
+            object defaultLoadContext = getDefaultMethod?.Invoke(null, null) ?? null;
+
+            if (targetAssemblyLoadContext is null || targetAssemblyLoadContext == defaultLoadContext)
+            {
+                // Default behavior: Return ModuleBuilder from the already loaded Datadog.Trace assembly
+                return ModuleBuilderHelper.GetModuleBuilder();
+            }
+            else
+            {
+                MethodInfo loadMethod = assemblyLoadContextType?.GetMethod("LoadFromAssemblyPath", BindingFlags.Public | BindingFlags.Instance);
+                var moduleBuilderHelperAssembly = loadMethod?.Invoke(targetAssemblyLoadContext, loadContextArgs) as Assembly;
+                var modulebuilderHelperType = moduleBuilderHelperAssembly?.GetType(typeof(ModuleBuilderHelper).FullName);
+                var getModuleBuilderMethod = modulebuilderHelperType?.GetMethod("GetModuleBuilder", BindingFlags.Public | BindingFlags.Static);
+
+                if (getModuleBuilderMethod is null)
+                {
+                    // Default behavior: Return ModuleBuilder from the already loaded Datadog.Trace assembly
+                    return ModuleBuilderHelper.GetModuleBuilder();
+                }
+                else
+                {
+                    return (ModuleBuilder)getModuleBuilderMethod.Invoke(null, null);
+                }
+            }
+#endif
+        }
 
         /// <summary>
         /// DynamicMethods delegates cache
@@ -61,8 +112,9 @@ namespace Datadog.Trace.DuckTyping
             /// <param name="index">Dynamic method index</param>
             internal static void FillDelegate(int index)
             {
-                _delegate = (TProxyDelegate)ILHelpersExtensions.GetDynamicMethodForIndex(index)
-                    .CreateDelegate(typeof(TProxyDelegate));
+                var dynamicMethod = ILHelpersExtensions.GetDynamicMethodForIndex(index);
+                var type = typeof(TProxyDelegate);
+                _delegate = (TProxyDelegate)dynamicMethod.CreateDelegate(type);
             }
         }
     }

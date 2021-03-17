@@ -105,13 +105,13 @@ namespace Datadog.Trace.DuckTyping
                 // If the instance is not public we need to create a Dynamic method to overpass the visibility checks
                 // we can't access non public types so we have to cast to object type (in the instance object and the return type).
 
-                string dynMethodName = $"_getNonPublicProperty_{targetProperty.DeclaringType.Name}_{targetProperty.Name}";
+                string dynMethodName = $"_getNonPublicProperty_{targetProperty.DeclaringType.Name}_{targetProperty.Name}_{++_dynamicMethodCount}";
                 returnType = UseDirectAccessTo(targetProperty.PropertyType) ? targetProperty.PropertyType : typeof(object);
 
                 // We create the dynamic method
                 Type[] targetParameters = GetPropertyGetParametersTypes(targetProperty, false, !targetMethod.IsStatic).ToArray();
                 Type[] dynParameters = targetMethod.IsStatic ? targetParametersTypes : (new[] { typeof(object) }).Concat(targetParametersTypes).ToArray();
-                DynamicMethod dynMethod = new DynamicMethod(dynMethodName, returnType, dynParameters, _moduleBuilder, true);
+                DynamicMethod dynMethod = new DynamicMethod(dynMethodName, returnType, dynParameters, TargetTypeToModuleBuilder(targetType), true);
 
                 // Emit the dynamic method body
                 LazyILGenerator dynIL = new LazyILGenerator(dynMethod.GetILGenerator());
@@ -260,7 +260,7 @@ namespace Datadog.Trace.DuckTyping
                 // We create the dynamic method
                 Type[] targetParameters = GetPropertySetParametersTypes(targetProperty, false, !targetMethod.IsStatic).ToArray();
                 Type[] dynParameters = targetMethod.IsStatic ? targetParametersTypes : (new[] { typeof(object) }).Concat(targetParametersTypes).ToArray();
-                DynamicMethod dynMethod = new DynamicMethod(dynMethodName, typeof(void), dynParameters, _moduleBuilder, true);
+                DynamicMethod dynMethod = new DynamicMethod(dynMethodName, typeof(void), dynParameters, TargetTypeToModuleBuilder(targetType), true);
 
                 // Emit the dynamic method body
                 LazyILGenerator dynIL = new LazyILGenerator(dynMethod.GetILGenerator());

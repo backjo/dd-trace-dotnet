@@ -130,14 +130,7 @@ namespace Datadog.Trace.DuckTyping
                         interfaceTypes = new[] { typeof(IDuckType) };
                     }
 
-                    // Ensures the module builder
-                    if (_moduleBuilder is null)
-                    {
-                        var id = Guid.NewGuid().ToString("N");
-                        AssemblyName aName = new AssemblyName("DuckTypeAssembly._" + id);
-                        _assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(aName, AssemblyBuilderAccess.Run);
-                        _moduleBuilder = _assemblyBuilder.DefineDynamicModule("MainModule");
-                    }
+                    ModuleBuilder moduleBuilder = TargetTypeToModuleBuilder(targetType);
 
                     string assembly = string.Empty;
                     if (targetType.Assembly != null)
@@ -154,7 +147,7 @@ namespace Datadog.Trace.DuckTyping
                     string proxyTypeName = $"{assembly}.{targetType.FullName.Replace(".", "_").Replace("+", "__")}.{proxyDefinitionType.FullName.Replace(".", "_").Replace("+", "__")}_{++_typeCount}";
 
                     // Create Type
-                    TypeBuilder proxyTypeBuilder = _moduleBuilder.DefineType(
+                    TypeBuilder proxyTypeBuilder = moduleBuilder.DefineType(
                         proxyTypeName,
                         typeAttributes,
                         parentType,
