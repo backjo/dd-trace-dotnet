@@ -70,6 +70,8 @@ namespace Datadog.Trace.ClrProfiler.IntegrationTests
                 new object[] { "2.11.4" },
                 new object[] { "2.11.5" },
                 new object[] { "2.11.6" },
+                new object[] { "2.12.0" },
+                new object[] { "2.12.1" },
 #endif
             };
 
@@ -238,10 +240,12 @@ namespace Datadog.Trace.ClrProfiler.IntegrationTests
                 new object[] { "1.1.1" },
                 new object[] { "1.1.2" },
                 new object[] { "1.1.3" },
+                new object[] { "1.1.4" },
                 new object[] { "2.0.0" },
                 new object[] { "2.0.1" },
                 new object[] { "2.1.0" },
                 new object[] { "2.1.1" },
+                new object[] { "2.1.2" },
 #endif
             };
 
@@ -445,10 +449,12 @@ namespace Datadog.Trace.ClrProfiler.IntegrationTests
                 new object[] { "3.1.10" },
                 new object[] { "3.1.11" },
                 new object[] { "3.1.12" },
+                new object[] { "3.1.13" },
                 new object[] { "5.0.0" },
                 new object[] { "5.0.1" },
                 new object[] { "5.0.2" },
                 new object[] { "5.0.3" },
+                new object[] { "5.0.4" },
 #endif
             };
 
@@ -472,6 +478,7 @@ namespace Datadog.Trace.ClrProfiler.IntegrationTests
                 new object[] { "19.9.0" },
                 new object[] { "19.10.0" },
                 new object[] { "19.10.1" },
+                new object[] { "19.11.0" },
 #endif
             };
 
@@ -497,6 +504,68 @@ namespace Datadog.Trace.ClrProfiler.IntegrationTests
                 new object[] { "2.19.91" },
                 new object[] { "2.19.100" },
                 new object[] { "2.19.101" },
+                new object[] { "2.19.110" },
+#endif
+            };
+
+        public static IEnumerable<object[]> XUnit =>
+
+            new List<object[]>
+            {
+#if DEFAULT_SAMPLES
+                new object[] { string.Empty },
+#else
+#if NETFRAMEWORK
+#endif
+                new object[] { "2.2.0" },
+                new object[] { "2.3.0" },
+                new object[] { "2.3.1" },
+                new object[] { "2.4.0" },
+                new object[] { "2.4.1" },
+#endif
+            };
+
+        public static IEnumerable<object[]> NUnit =>
+
+            new List<object[]>
+            {
+#if DEFAULT_SAMPLES
+                new object[] { string.Empty },
+#else
+#if NETFRAMEWORK
+#endif
+                new object[] { "3.6.0" },
+                new object[] { "3.6.1" },
+                new object[] { "3.7.0" },
+                new object[] { "3.7.1" },
+                new object[] { "3.8.0" },
+                new object[] { "3.8.1" },
+                new object[] { "3.9.0" },
+                new object[] { "3.10.0" },
+                new object[] { "3.10.1" },
+                new object[] { "3.11.0" },
+                new object[] { "3.12.0" },
+                new object[] { "3.13.0" },
+                new object[] { "3.13.1" },
+#endif
+            };
+
+        public static IEnumerable<object[]> MSTest =>
+
+            new List<object[]>
+            {
+#if DEFAULT_SAMPLES
+                new object[] { string.Empty },
+#else
+#if NETFRAMEWORK
+#endif
+                new object[] { "2.0.0" },
+                new object[] { "2.1.0" },
+                new object[] { "2.1.1" },
+                new object[] { "2.1.2" },
+                new object[] { "2.2.1" },
+                new object[] { "2.2.2" },
+                new object[] { "2.2.3" },
 #endif
             };
 
