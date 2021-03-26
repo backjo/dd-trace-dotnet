@@ -147,8 +147,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Samples.Npgsql", "test\test
 		{85F35AAF-D102-4960-8B41-3BD9CBD0E77F} = {85F35AAF-D102-4960-8B41-3BD9CBD0E77F}
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Samples.Shared", "test\test-applications\integrations\dependency-libs\Samples.Shared\Samples.Shared.csproj", "{B4AE8B0F-C2B2-41DF-88BB-D97E267D8964}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Samples.WebForms", "test\test-applications\aspnet\Samples.WebForms\Samples.WebForms.csproj", "{99A62CCF-8E7F-4D57-8383-D38C371C8087}"
 	ProjectSection(ProjectDependencies) = postProject
 		{C0C8D381-D6B9-4C76-9428-F40F2FA93A9A} = {C0C8D381-D6B9-4C76-9428-F40F2FA93A9A}
@@ -205,6 +203,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AssemblyLoad.FileNotFoundEx
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docker", "docker", "{6ABAD006-E206-488E-ACA1-1AA73F9B5146}"
 	ProjectSection(SolutionItems) = preProject
+		build\docker\build.arm64.sh = build\docker\build.arm64.sh
 		build\docker\build.sh = build\docker\build.sh
 		build\docker\Datadog.Trace.ClrProfiler.IntegrationTests.sh = build\docker\Datadog.Trace.ClrProfiler.IntegrationTests.sh
 		build\docker\Datadog.Trace.ClrProfiler.Native.sh = build\docker\Datadog.Trace.ClrProfiler.Native.sh
@@ -215,7 +214,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docker", "docker", "{6ABAD0
 		build\docker\package.sh = build\docker\package.sh
 		build\docker\with-profiler-logs.bash = build\docker\with-profiler-logs.bash
 		build\docker\with-profiler.bash = build\docker\with-profiler.bash
-		build\docker\build.arm64.sh = build\docker\build.arm64.sh
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".azure-pipelines", ".azure-pipelines", "{C52D6695-4E05-4930-88F8-0EFF8056A967}"
@@ -604,6 +602,7 @@ Global
 		{4B243CF1-4269-45C6-A238-1A9BFA58B8CC}.Release|x86.ActiveCfg = Release|Any CPU
 		{4B243CF1-4269-45C6-A238-1A9BFA58B8CC}.Release|x86.Build.0 = Release|Any CPU
 		{0D546118-B70A-44D0-B675-39EDB99FCEEE}.Debug|Any CPU.ActiveCfg = Debug|x86
+		{0D546118-B70A-44D0-B675-39EDB99FCEEE}.Debug|Any CPU.Build.0 = Debug|x86
 		{0D546118-B70A-44D0-B675-39EDB99FCEEE}.Debug|x64.ActiveCfg = Debug|x64
 		{0D546118-B70A-44D0-B675-39EDB99FCEEE}.Debug|x64.Build.0 = Debug|x64
 		{0D546118-B70A-44D0-B675-39EDB99FCEEE}.Debug|x86.ActiveCfg = Debug|x86
@@ -613,7 +612,6 @@ Global
 		{0D546118-B70A-44D0-B675-39EDB99FCEEE}.Release|x64.Build.0 = Release|x64
 		{0D546118-B70A-44D0-B675-39EDB99FCEEE}.Release|x86.ActiveCfg = Release|x86
 		{0D546118-B70A-44D0-B675-39EDB99FCEEE}.Release|x86.Build.0 = Release|x86
-		{0D546118-B70A-44D0-B675-39EDB99FCEEE}.Debug|Any CPU.Build.0 = Debug|x86
 		{086FF8A0-9CEE-470A-9751-78B0F1340649}.Debug|Any CPU.ActiveCfg = Debug|x86
 		{086FF8A0-9CEE-470A-9751-78B0F1340649}.Debug|x64.ActiveCfg = Debug|x64
 		{086FF8A0-9CEE-470A-9751-78B0F1340649}.Debug|x64.Build.0 = Debug|x64
@@ -678,18 +676,6 @@ Global
 		{DD3E8ED8-A0E4-482E-A5ED-115E21D543C0}.Release|x64.Build.0 = Release|x64
 		{DD3E8ED8-A0E4-482E-A5ED-115E21D543C0}.Release|x86.ActiveCfg = Release|x86
 		{DD3E8ED8-A0E4-482E-A5ED-115E21D543C0}.Release|x86.Build.0 = Release|x86
-		{B4AE8B0F-C2B2-41DF-88BB-D97E267D8964}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{B4AE8B0F-C2B2-41DF-88BB-D97E267D8964}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{B4AE8B0F-C2B2-41DF-88BB-D97E267D8964}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{B4AE8B0F-C2B2-41DF-88BB-D97E267D8964}.Debug|x64.Build.0 = Debug|Any CPU
-		{B4AE8B0F-C2B2-41DF-88BB-D97E267D8964}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{B4AE8B0F-C2B2-41DF-88BB-D97E267D8964}.Debug|x86.Build.0 = Debug|Any CPU
-		{B4AE8B0F-C2B2-41DF-88BB-D97E267D8964}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{B4AE8B0F-C2B2-41DF-88BB-D97E267D8964}.Release|Any CPU.Build.0 = Release|Any CPU
-		{B4AE8B0F-C2B2-41DF-88BB-D97E267D8964}.Release|x64.ActiveCfg = Release|Any CPU
-		{B4AE8B0F-C2B2-41DF-88BB-D97E267D8964}.Release|x64.Build.0 = Release|Any CPU
-		{B4AE8B0F-C2B2-41DF-88BB-D97E267D8964}.Release|x86.ActiveCfg = Release|Any CPU
-		{B4AE8B0F-C2B2-41DF-88BB-D97E267D8964}.Release|x86.Build.0 = Release|Any CPU
 		{99A62CCF-8E7F-4D57-8383-D38C371C8087}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{99A62CCF-8E7F-4D57-8383-D38C371C8087}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{99A62CCF-8E7F-4D57-8383-D38C371C8087}.Debug|x64.ActiveCfg = Debug|Any CPU
@@ -1611,7 +1597,6 @@ Global
 		{5B52C0C0-A554-4E53-9D17-B121E78FF919} = {8CEC2042-F11C-49F5-A674-2355793B600A}
 		{3493346B-44F6-4F50-8FB4-51D0090DF544} = {BAF8F246-3645-42AD-B1D0-0F7EAFBAB34A}
 		{DD3E8ED8-A0E4-482E-A5ED-115E21D543C0} = {BAF8F246-3645-42AD-B1D0-0F7EAFBAB34A}
-		{B4AE8B0F-C2B2-41DF-88BB-D97E267D8964} = {8683D82A-2BBE-4199-9C36-C59F48804F90}
 		{99A62CCF-8E7F-4D57-8383-D38C371C8087} = {AFA0AB23-64F0-4AC1-9050-6CE8FE06F580}
 		{D1729F17-99A5-45AF-AB38-72FA6ECCE609} = {498A300E-D036-49B7-A43D-821D1CAF11A5}
 		{AD119B05-A092-41AD-B68E-4AE2DB5A96D9} = {BAF8F246-3645-42AD-B1D0-0F7EAFBAB34A}

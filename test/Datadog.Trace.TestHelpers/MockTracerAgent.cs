@@ -209,8 +209,6 @@ namespace Datadog.Trace.TestHelpers
                        .ToImmutableList();
             }
 
-            Console.WriteLine($"Timeline entries: {AggregatePipeServer.Timeline.Count}");
-
             return relevantSpans;
         }
 
@@ -349,8 +347,6 @@ namespace Datadog.Trace.TestHelpers
 
                         var spans = MessagePackSerializer.Deserialize<IList<IList<Span>>>(args.Message.BodyBytes);
                         OnRequestDeserialized(spans);
-
-                        Console.WriteLine($"Timeline entries: {AggregatePipeServer.Timeline.Count}");
 
                         lock (this)
                         {
