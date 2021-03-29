@@ -116,6 +116,11 @@ jobs:
       containerregistrytype: Container Registry
       dockerComposeCommand: run -e TestAllPackageVersions=true -e buildConfiguration=$(buildConfiguration) -e publishTargetFramework=$(publishTargetFramework) IntegrationTests
 
+  - task: PublishCodeCoverageResults@1
+    inputs:
+      codeCoverageTool: 'Cobertura'
+      summaryFileLocation: '/project/cover/**/coverage.*.xml'
+
   - publish: dotnet-tracer-native.log
     artifact: $(Agent.JobName)_profiler-logs
     condition: succeededOrFailed()
