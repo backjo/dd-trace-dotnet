@@ -26,3 +26,6 @@ dotnet vstest test/Datadog.Trace.ClrProfiler.IntegrationTests/bin/$buildConfigur
 
 cp /var/log/datadog/dotnet/dotnet-tracer-native.log /project/
 cp -R /var/log/datadog/cover /project/
+
+ls /var/log/datadog/cover
+ls /project/
