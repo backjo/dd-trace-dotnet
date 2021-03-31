@@ -24,7 +24,7 @@ wait-for-it postgres:5432 -- \
 dotnet vstest test/Datadog.Trace.ClrProfiler.IntegrationTests/bin/$buildConfiguration/$publishTargetFramework/publish/Datadog.Trace.ClrProfiler.IntegrationTests.dll --logger:trx --ResultsDirectory:test/Datadog.Trace.ClrProfiler.IntegrationTests/results
 
 # Collect run data
-mkdir /tmp/integrationsTest
-cp /var/log/datadog/dotnet/dotnet-tracer-native.log /tmp/integrationsTest/.
-cp /tmp/coredump* /tmp/integrationsTest/. 2>/dev/null || :
-ls /tmp/integrationsTest
+mkdir /project/data
+cp /var/log/datadog/dotnet/dotnet-tracer-native.log /project/data/
+cp /tmp/coredump* /project/data/ 2>/dev/null || :
+ls /project/data
