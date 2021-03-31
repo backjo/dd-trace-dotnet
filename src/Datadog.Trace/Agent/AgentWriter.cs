@@ -146,7 +146,6 @@ namespace Datadog.Trace.Agent
 
                 // In some situations, the flush thread can exit before flushing all the threads
                 // Force a flush for the leftover traces
-
                 whenAnyArray[0] = Task.Factory.StartNew(state => ((AgentWriter)state).FlushBuffers(flushAllBuffers: true), this).Unwrap();
                 whenAnyArray[1] = delay;
                 completedTask = await Task.WhenAny(whenAnyArray).ConfigureAwait(false);
@@ -168,7 +167,7 @@ namespace Datadog.Trace.Agent
                 // Enqueue a watermark to know when it's done serializing all currently enqueued traces
                 var tcs = new TaskCompletionSource<bool>(TaskOptions);
 
-                WriteWatermark(() => CompleteTaskCompletionSource(tcs));
+                WriteWatermark(state => CompleteTaskCompletionSource((TaskCompletionSource<bool>)state), tcs);
 
                 await tcs.Task.ConfigureAwait(false);
             }
@@ -176,9 +175,9 @@ namespace Datadog.Trace.Agent
             await FlushBuffers().ConfigureAwait(false);
         }
 
-        internal void WriteWatermark(Action watermark, bool wakeUpThread = true)
+        internal void WriteWatermark(Action<object> watermark, object state, bool wakeUpThread = true)
         {
-            _pendingTraces.Enqueue(new WorkItem(watermark));
+            _pendingTraces.Enqueue(new WorkItem(watermark, state));
 
             if (wakeUpThread)
             {
@@ -204,13 +203,13 @@ namespace Datadog.Trace.Agent
 
         private async Task FlushBuffersTaskLoopAsync()
         {
-            Task[] whenAnyTasks = new Task[3];
+            Task[] whenAnyArray = new Task[3];
             while (true)
             {
-                whenAnyTasks[0] = Task.Delay(TimeSpan.FromSeconds(1));
-                whenAnyTasks[1] = _serializationTask;
-                whenAnyTasks[2] = _forceFlush.Task;
-                await Task.WhenAny(whenAnyTasks).ConfigureAwait(false);
+                whenAnyArray[0] = Task.Delay(TimeSpan.FromSeconds(1));
+                whenAnyArray[1] = _serializationTask;
+                whenAnyArray[2] = _forceFlush.Task;
+                await Task.WhenAny(whenAnyArray).ConfigureAwait(false);
 
                 if (_forceFlush.Task.IsCompleted)
                 {
@@ -373,7 +372,7 @@ namespace Datadog.Trace.Agent
                         if (item.Trace == null)
                         {
                             // Found a watermark
-                            item.Callback();
+                            item.ExecuteCallback();
                             continue;
                         }
 
@@ -407,18 +406,26 @@ namespace Datadog.Trace.Agent
         private readonly struct WorkItem
         {
             public readonly Span[] Trace;
-            public readonly Action Callback;
+            public readonly Action<object> Callback;
+            public readonly object State;
 
             public WorkItem(Span[] trace)
             {
                 Trace = trace;
                 Callback = null;
+                State = null;
             }
 
-            public WorkItem(Action callback)
+            public WorkItem(Action<object> callback, object state = null)
             {
                 Trace = null;
                 Callback = callback;
+                State = state;
+            }
+
+            public void ExecuteCallback()
+            {
+                Callback?.Invoke(State);
             }
         }
     }
