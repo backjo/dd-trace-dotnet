@@ -8,8 +8,10 @@ touch /var/log/datadog/dotnet/dotnet-tracer-native.log
 
 mkdir -p /var/log/datadog/cover
 
-dotnet tool install -g coverlet.console
-export PATH="$PATH:/root/.dotnet/tools"
+if [[ ! -z "$TEST_COVERAGE" ]]; then
+  dotnet tool install -g coverlet.console
+  export PATH="$PATH:/root/.dotnet/tools" 
+fi
 
 dotnet vstest test/Datadog.Trace.IntegrationTests/bin/$buildConfiguration/$publishTargetFramework/publish/Datadog.Trace.IntegrationTests.dll --logger:trx --ResultsDirectory:test/Datadog.Trace.IntegrationTests/results
 
