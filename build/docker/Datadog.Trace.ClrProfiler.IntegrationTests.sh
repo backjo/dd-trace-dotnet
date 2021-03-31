@@ -32,6 +32,6 @@ cp /var/log/datadog/dotnet/dotnet-tracer-native.log /project/data/
 cp /tmp/coredump* /project/data/ 2>/dev/null || :
 ls /project/data
 
-if [ $st01 -eq 1 ] || [ $st02 -eq 1 ] || [ $st03 -eq 1 ] then
+if [ $st01 -eq 1 ] || [ $st02 -eq 1 ] || [ $st03 -eq 1 ]; then
     exit 1
 fi
