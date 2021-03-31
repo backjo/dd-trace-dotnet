@@ -194,13 +194,13 @@ namespace Datadog.Trace.Agent
 
         private async Task FlushBuffersTaskLoopAsync()
         {
+            Task[] whenAnyTasks = new Task[3];
             while (true)
             {
-                await Task.WhenAny(
-                        Task.Delay(TimeSpan.FromSeconds(1)),
-                        _serializationTask,
-                        _forceFlush.Task)
-                    .ConfigureAwait(false);
+                whenAnyTasks[0] = Task.Delay(TimeSpan.FromSeconds(1));
+                whenAnyTasks[1] = _serializationTask;
+                whenAnyTasks[2] = _forceFlush.Task;
+                await Task.WhenAny(whenAnyTasks).ConfigureAwait(false);
 
                 if (_forceFlush.Task.IsCompleted)
                 {

@@ -581,8 +581,8 @@ jobs:
       containerregistrytype: Container Registry
       dockerComposeCommand: run -e TestAllPackageVersions=true -e buildConfiguration=$(buildConfiguration) IntegrationTests.ARM64.Core50
 
-  - publish: dotnet-tracer-native.log
-    artifact: $(Agent.JobName)_profiler-logs
+  - publish: /tmp/integrationsTest/
+    artifact: $(Agent.JobName)_data
     condition: succeededOrFailed()
 
   - task: PublishTestResults@2
