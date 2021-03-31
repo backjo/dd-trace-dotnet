@@ -25,7 +25,7 @@ namespace Datadog.Trace.DiagnosticListeners
         {
             if (diagnosticListener.Name == ListenerName)
             {
-                return diagnosticListener.Subscribe(this, evName => IsEventEnabled(evName)));
+                return diagnosticListener.Subscribe(this, evName => IsEventEnabled(evName));
             }
 
             return null;
