@@ -28,7 +28,7 @@ st03=$?
 
 # Collect run data
 mkdir /project/data
-cp /var/log/datadog/dotnet/dotnet-tracer-native.log /project/data/
+cp /var/log/datadog/dotnet/* /project/data/
 cp /tmp/coredump* /project/data/ 2>/dev/null || :
 ls /project/data
 
