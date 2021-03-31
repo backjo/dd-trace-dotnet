@@ -33,6 +33,6 @@ cp /tmp/coredump* /project/data/ 2>/dev/null || :
 ls /project/data
 
 
-[ st01 -eq 1 ] && exit st01
-[ st02 -eq 1 ] && exit st02
-[ st03 -eq 1 ] && exit st03
+[ $st01 -eq 1 ] && exit st01
+[ $st02 -eq 1 ] && exit st02
+[ $st03 -eq 1 ] && exit st03
