@@ -146,7 +146,7 @@ namespace Datadog.Trace.Agent
 
                 // In some situations, the flush thread can exit before flushing all the threads
                 // Force a flush for the leftover traces
-                whenAnyArray[0] = Task.Run(() => FlushBuffers(flushAllBuffers: true));
+                whenAnyArray[0] = Task.Factory.StartNew(state => ((AgentWriter)state).FlushBuffers(flushAllBuffers: true), this);
                 whenAnyArray[1] = delay;
                 completedTask = await Task.WhenAny(whenAnyArray).ConfigureAwait(false);
 
