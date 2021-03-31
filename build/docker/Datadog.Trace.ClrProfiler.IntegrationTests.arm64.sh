@@ -25,4 +25,4 @@ dotnet vstest test/Datadog.Trace.ClrProfiler.IntegrationTests/bin/$buildConfigur
 # Collect run data
 mkdir /tmp/integrationsTest
 cp /var/log/datadog/dotnet/dotnet-tracer-native.log /tmp/integrationsTest/
-cp /tmp/coredump* /tmp/integrationsTest
+cp /tmp/coredump* /tmp/integrationsTest 2>/dev/null || :
